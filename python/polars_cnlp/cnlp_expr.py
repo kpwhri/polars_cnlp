@@ -18,6 +18,16 @@ class ClinicalNlpExpr:
     def __init__(self, expr: pl.Expr):
         self._expr = expr
 
+    def contains(self, pattern: str) -> pl.Expr:
+        """Check whether the text contains a regular expression."""
+        return register_plugin_function(
+            plugin_path=_PLUGIN_PATH,
+            function_name='contains_target',
+            args=[self._expr],
+            kwargs={'pattern': pattern},
+            is_elementwise=True,
+        )
+
     def count(self, term: str) -> pl.Expr:
         """Count occurrences of a concept.
 
