@@ -5,16 +5,33 @@ pub mod temporality;
 
 use crate::engine::rule::ContextRule;
 
-pub fn default_rules() -> Vec<ContextRule> {
-    let mut rules = Vec::new();
+/// Return the package's default sentence-level ConText rule set.
+pub fn context_rules() -> Vec<ContextRule> {
+    let mut rules = assertion::negation_rules();
 
-    rules.extend(assertion::rules());
+    rules.extend(control::assertion_rules());
+
+    rules.extend(assertion::context_possible_rules());
 
     rules.extend(temporality::rules());
 
     rules.extend(experiencer::rules());
 
-    rules.extend(control::rules());
+    rules.extend(control::context_rules());
+
+    rules
+}
+
+/// Return the package's default NegEx trigger set.
+///
+/// This includes the later PREP/POSP "possible" categories in addition to
+/// negation, pseudo, and conjunction rules.
+pub fn negex_rules() -> Vec<ContextRule> {
+    let mut rules = assertion::negation_rules();
+
+    rules.extend(assertion::negex_possible_rules());
+
+    rules.extend(control::assertion_rules());
 
     rules
 }
@@ -22,42 +39,60 @@ pub fn default_rules() -> Vec<ContextRule> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::finding::{Assertion, Experiencer, Temporality};
     use crate::engine::rule::{RuleBehavior, RuleSet};
 
     #[test]
-    fn default_rules_are_not_empty() {
-        assert!(!default_rules().is_empty());
+    fn context_rules_compile() {
+        assert!(RuleSet::compile(&context_rules(),).is_ok());
     }
 
     #[test]
-    fn default_rules_compile() {
-        assert!(RuleSet::compile(&default_rules(),).is_ok());
+    fn negex_rules_compile() {
+        assert!(RuleSet::compile(&negex_rules(),).is_ok());
     }
 
     #[test]
-    fn default_rules_include_context_rules() {
-        assert!(
-            default_rules()
-                .iter()
-                .any(|rule| { matches!(rule.behavior, RuleBehavior::Context(_)) })
-        );
+    fn context_rules_include_hypothetical_temporality() {
+        assert!(context_rules().iter().any(|rule| {
+            let RuleBehavior::Context(behavior) = &rule.behavior else {
+                return false;
+            };
+
+            behavior.effect.temporality == Some(Temporality::Hypothetical)
+        },));
     }
 
     #[test]
-    fn default_rules_include_terminators() {
-        assert!(
-            default_rules()
-                .iter()
-                .any(|rule| { rule.behavior == RuleBehavior::Terminate })
-        );
+    fn context_rules_include_other_experiencer() {
+        assert!(context_rules().iter().any(|rule| {
+            let RuleBehavior::Context(behavior) = &rule.behavior else {
+                return false;
+            };
+
+            behavior.effect.experiencer == Some(Experiencer::Other)
+        },));
     }
 
     #[test]
-    fn default_rules_include_pseudo_rules() {
-        assert!(
-            default_rules()
-                .iter()
-                .any(|rule| { rule.behavior == RuleBehavior::Pseudo })
-        );
+    fn negex_rules_include_possible_assertion() {
+        assert!(negex_rules().iter().any(|rule| {
+            let RuleBehavior::Context(behavior) = &rule.behavior else {
+                return false;
+            };
+
+            behavior.effect.assertion == Some(Assertion::Possible)
+        },));
+    }
+
+    #[test]
+    fn negex_rules_do_not_modify_temporality() {
+        assert!(negex_rules().iter().all(|rule| {
+            let RuleBehavior::Context(behavior) = &rule.behavior else {
+                return true;
+            };
+
+            behavior.effect.temporality.is_none()
+        },));
     }
 }

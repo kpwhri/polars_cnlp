@@ -4,6 +4,7 @@ from pathlib import Path
 import polars as pl
 from polars.plugins import register_plugin_function
 
+from polars_cnlp.algorithms import AlgorithmLike, algorithm_kwargs
 from polars_cnlp.mapping import TermPatterns, FindPatterns, mapping_terms_kwargs, predicate_terms_kwargs, \
     find_terms_kwargs
 
@@ -16,16 +17,6 @@ class ClinicalNlpExpr:
 
     def __init__(self, expr: pl.Expr):
         self._expr = expr
-
-    def contains(self, pattern: str) -> pl.Expr:
-        """Check whether the text contains a regular expression."""
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='contains_target',
-            args=[self._expr],
-            kwargs={'pattern': pattern},
-            is_elementwise=True,
-        )
 
     def count(self, term: str) -> pl.Expr:
         """Count occurrences of a concept.
@@ -94,7 +85,12 @@ class ClinicalNlpExpr:
             is_elementwise=True,
         )
 
-    def affirmed(self, term: str) -> pl.Expr:
+    def affirmed(
+            self,
+            term: str,
+            *,
+            algorithm: AlgorithmLike = 'context',
+    ) -> pl.Expr:
         """ Check whether a concept is affirmed.
 
         Returns `True` when at least one occurrence is affirmed, `False`
@@ -105,6 +101,9 @@ class ClinicalNlpExpr:
         ----------
         term
             Regular expression defining the concept.
+        algorithm
+            Context algorithm. Use `'context'`, `'negex'`, or an
+            `Algorithm` instance.
 
         Returns
         -------
@@ -125,11 +124,19 @@ class ClinicalNlpExpr:
             plugin_path=_PLUGIN_PATH,
             function_name='affirmed_concept',
             args=[self._expr],
-            kwargs={'pattern': term},
+            kwargs=algorithm_kwargs(
+                {'pattern': term},
+                algorithm,
+            ),
             is_elementwise=True,
         )
 
-    def affirmed_any(self, terms: TermPatterns) -> pl.Expr:
+    def affirmed_any(
+            self,
+            terms: TermPatterns,
+            *,
+            algorithm: AlgorithmLike = 'context',
+    ) -> pl.Expr:
         """
         Check whether any requested concept is affirmed.
 
@@ -139,6 +146,9 @@ class ClinicalNlpExpr:
             Regular expressions supplied either as a sequence or as a
             mapping from labels to regular expressions. Labels are used
             only for diagnostics.
+        algorithm
+            Context algorithm. Use `'context'`, `'negex'`, or an
+            `Algorithm` instance.
 
         Returns
         -------
@@ -165,11 +175,19 @@ class ClinicalNlpExpr:
             plugin_path=_PLUGIN_PATH,
             function_name='affirmed_any_concepts',
             args=[self._expr],
-            kwargs=predicate_terms_kwargs(terms),
+            kwargs=algorithm_kwargs(
+                predicate_terms_kwargs(terms),
+                algorithm,
+            ),
             is_elementwise=True,
         )
 
-    def affirmed_all(self, terms: TermPatterns) -> pl.Expr:
+    def affirmed_all(
+            self,
+            terms: TermPatterns,
+            *,
+            algorithm: AlgorithmLike = 'context',
+    ) -> pl.Expr:
         """
         Check whether all requested concepts are affirmed.
 
@@ -179,6 +197,9 @@ class ClinicalNlpExpr:
             Regular expressions supplied either as a sequence or as a
             mapping from labels to regular expressions. Labels are used
             only for diagnostics.
+        algorithm
+            Context algorithm. Use `'context'`, `'negex'`, or an
+            `Algorithm` instance.
 
         Returns
         -------
@@ -206,11 +227,19 @@ class ClinicalNlpExpr:
             plugin_path=_PLUGIN_PATH,
             function_name='affirmed_all_concepts',
             args=[self._expr],
-            kwargs=predicate_terms_kwargs(terms),
+            kwargs=algorithm_kwargs(
+                predicate_terms_kwargs(terms),
+                algorithm,
+            ),
             is_elementwise=True,
         )
 
-    def affirmed_each(self, terms: Mapping[str, str]) -> pl.Expr:
+    def affirmed_each(
+            self,
+            terms: Mapping[str, str],
+            *,
+            algorithm: AlgorithmLike = 'context',
+    ) -> pl.Expr:
         """
         Check affirmation status for each named concept.
 
@@ -218,6 +247,9 @@ class ClinicalNlpExpr:
         ----------
         terms
             Mapping from output field name to regular expression.
+        algorithm
+            Context algorithm. Use `'context'`, `'negex'`, or an
+            `Algorithm` instance.
 
         Returns
         -------
@@ -244,18 +276,26 @@ class ClinicalNlpExpr:
             plugin_path=_PLUGIN_PATH,
             function_name='affirmed_each_concepts',
             args=[self._expr],
-            kwargs=mapping_terms_kwargs(terms),
+            kwargs=algorithm_kwargs(
+                mapping_terms_kwargs(terms),
+                algorithm,
+            ),
             is_elementwise=True,
         )
 
-    def find_best(self, terms: FindPatterns) -> pl.Expr:
+    def find_best(
+            self,
+            terms: FindPatterns,
+            *,
+            algorithm: AlgorithmLike = 'context',
+    ) -> pl.Expr:
         """
         Return the highest-ranked contextualized finding.
 
         Findings are ranked by experiencer, temporality, assertion, and
         then text position. Patient findings are preferred over other
-        experiencers, current over historical, and affirmed over possible
-        over negated.
+        experiencers, current over historical over hypothetical, and
+        affirmed over possible over negated.
 
         Parameters
         ----------
@@ -263,6 +303,9 @@ class ClinicalNlpExpr:
             A regular expression or mapping from finding label to regular
             expression. A single regular expression produces a null
             `label` field.
+        algorithm
+            Context algorithm. Use `'context'`, `'negex'`, or an
+            `Algorithm` instance.
 
         Returns
         -------
@@ -288,11 +331,19 @@ class ClinicalNlpExpr:
             plugin_path=_PLUGIN_PATH,
             function_name='find_best_concept',
             args=[self._expr],
-            kwargs=find_terms_kwargs(terms),
+            kwargs=algorithm_kwargs(
+                find_terms_kwargs(terms),
+                algorithm,
+            ),
             is_elementwise=True,
         )
 
-    def find_all(self, terms: FindPatterns) -> pl.Expr:
+    def find_all(
+            self,
+            terms: FindPatterns,
+            *,
+            algorithm: AlgorithmLike = 'context',
+    ) -> pl.Expr:
         """
         Return all contextualized findings.
 
@@ -304,6 +355,9 @@ class ClinicalNlpExpr:
             A regular expression or mapping from finding label to regular
             expression. A single regular expression produces null values
             in the `label` field.
+        algorithm
+            Context algorithm. Use `'context'`, `'negex'`, or an
+            `Algorithm` instance.
 
         Returns
         -------
@@ -331,6 +385,9 @@ class ClinicalNlpExpr:
             plugin_path=_PLUGIN_PATH,
             function_name='find_all_concepts',
             args=[self._expr],
-            kwargs=find_terms_kwargs(terms),
+            kwargs=algorithm_kwargs(
+                find_terms_kwargs(terms),
+                algorithm,
+            ),
             is_elementwise=True,
         )

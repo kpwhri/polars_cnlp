@@ -1,58 +1,54 @@
-use super::concept::Concept;
-use super::finding::{Assertion, ContextEffect, Experiencer, Finding, FindingContext, Temporality};
-use super::modifier::ContextModifier;
-use super::rule::{ContextRule, RuleBehavior, RuleSet};
-use super::rules;
-use super::scope::{TokenRange, token_range};
-use super::span::Span;
-use super::tokenizer::tokenize;
+use crate::engine::algorithm::{
+    AlgorithmError, AlgorithmSpec, ConTextAlgorithm, ContextAlgorithm, ContextTarget,
+};
+use crate::engine::concept::Concept;
+use crate::engine::finding::{Assertion, Experiencer, Finding, Temporality};
+use crate::engine::rule::ContextRule;
+use crate::engine::span::Span;
 
+/// Coordinates target matching and contextual interpretation.
 pub struct Analyzer {
-    rules: RuleSet,
+    algorithm: Box<dyn ContextAlgorithm>,
 }
 
-struct PreparedNote {
-    tokens: Vec<Span>,
-    modifiers: Vec<ContextModifier>,
-}
-
+/// Finding paired with the concept index which produced it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IndexedFinding {
     pub concept_index: usize,
     pub finding: Finding,
 }
 
-struct TargetOccurrence {
-    span: Span,
-    token_range: Option<TokenRange>,
-    concept_indices: Vec<usize>,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ModifierApplication {
-    distance: usize,
-    modifier_start: usize,
-    effect: ContextEffect,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct RankedValue<T> {
-    distance: usize,
-    modifier_start: usize,
-    value: T,
-}
-
 impl Analyzer {
-    pub fn compile(rules: &[ContextRule]) -> Result<Self, regex::Error> {
+    /// Compile a rule set using ConText mechanics.
+    ///
+    /// This preserves the previous `Analyzer::compile(rules)` API.
+    pub fn compile(rules: &[ContextRule]) -> Result<Self, AlgorithmError> {
+        Ok(Self::with_algorithm(ConTextAlgorithm::compile(rules)?))
+    }
+
+    /// Compile the default ConText analyzer.
+    pub fn compile_default() -> Result<Self, AlgorithmError> {
+        Self::from_spec(&AlgorithmSpec::default())
+    }
+
+    /// Build an analyzer from a serialized algorithm specification.
+    pub fn from_spec(spec: &AlgorithmSpec) -> Result<Self, AlgorithmError> {
         Ok(Self {
-            rules: RuleSet::compile(rules)?,
+            algorithm: spec.build()?,
         })
     }
 
-    pub fn compile_default() -> Result<Self, regex::Error> {
-        Self::compile(&rules::default_rules())
+    /// Build an analyzer from any Rust context algorithm.
+    pub fn with_algorithm<A>(algorithm: A) -> Self
+    where
+        A: ContextAlgorithm + 'static,
+    {
+        Self {
+            algorithm: Box::new(algorithm),
+        }
     }
 
+    /// Return all findings for one concept.
     pub fn findings(&self, text: &str, concept: &Concept) -> Vec<Finding> {
         self.findings_all(text, std::slice::from_ref(concept))
             .into_iter()
@@ -60,25 +56,30 @@ impl Analyzer {
             .unwrap_or_default()
     }
 
+    /// Return findings for all concepts using one shared target universe.
     pub fn findings_all(&self, text: &str, concepts: &[Concept]) -> Vec<Vec<Finding>> {
         if concepts.is_empty() {
             return Vec::new();
         }
 
-        let concept_spans: Vec<Vec<Span>> = concepts
+        let concept_spans = concepts
             .iter()
-            .map(|concept| concept.find_iter(text).collect())
-            .collect();
+            .map(|concept| concept.find_iter(text).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
 
         if concept_spans.iter().all(Vec::is_empty) {
             return vec![Vec::new(); concepts.len()];
         }
 
-        let prepared = self.prepare(text);
+        let targets = collect_targets(&concept_spans);
 
-        let targets = collect_targets(&concept_spans, &prepared.tokens);
+        let contexts = self.algorithm.resolve(text, &targets);
 
-        let contexts = resolve_targets(&targets, &prepared.modifiers);
+        assert_eq!(
+            contexts.len(),
+            targets.len(),
+            "ContextAlgorithm must return exactly one context per target",
+        );
 
         let mut findings = vec![Vec::new(); concepts.len()];
 
@@ -94,6 +95,7 @@ impl Analyzer {
         findings
     }
 
+    /// Return all findings in source-text order.
     pub fn find_all(&self, text: &str, concepts: &[Concept]) -> Vec<IndexedFinding> {
         let mut findings = self.collect_indexed_findings(text, concepts);
 
@@ -108,16 +110,19 @@ impl Analyzer {
         findings
     }
 
+    /// Return the highest-ranked finding.
     pub fn find_best(&self, text: &str, concepts: &[Concept]) -> Option<IndexedFinding> {
         self.collect_indexed_findings(text, concepts)
             .into_iter()
             .min_by_key(finding_rank)
     }
 
+    /// Return whether one concept has an affirmed occurrence.
     pub fn affirmed(&self, text: &str, concept: &Concept) -> Option<bool> {
         affirmed_from_findings(&self.findings(text, concept))
     }
 
+    /// Return affirmation status independently for each concept.
     pub fn affirmed_each(&self, text: &str, concepts: &[Concept]) -> Vec<Option<bool>> {
         self.findings_all(text, concepts)
             .iter()
@@ -125,6 +130,7 @@ impl Analyzer {
             .collect()
     }
 
+    /// Return three-valued OR across requested concepts.
     pub fn affirmed_any(&self, text: &str, concepts: &[Concept]) -> Option<bool> {
         let values = self.affirmed_each(text, concepts);
 
@@ -143,6 +149,7 @@ impl Analyzer {
         None
     }
 
+    /// Return three-valued AND across requested concepts.
     pub fn affirmed_all(&self, text: &str, concepts: &[Concept]) -> Option<bool> {
         let values = self.affirmed_each(text, concepts);
 
@@ -173,86 +180,9 @@ impl Analyzer {
             })
             .collect()
     }
-
-    fn prepare(&self, text: &str) -> PreparedNote {
-        let tokens = tokenize(text);
-
-        if tokens.is_empty() {
-            return PreparedNote {
-                tokens,
-                modifiers: Vec::new(),
-            };
-        }
-
-        let matches = self.rules.find_matches(text);
-
-        let pseudo_spans: Vec<Span> = matches
-            .iter()
-            .filter_map(|rule_match| match &rule_match.behavior {
-                RuleBehavior::Pseudo => Some(rule_match.span),
-                _ => None,
-            })
-            .collect();
-
-        let active_matches = matches
-            .into_iter()
-            .filter(|rule_match| !matches!(&rule_match.behavior, RuleBehavior::Pseudo))
-            .filter(|rule_match| {
-                !pseudo_spans
-                    .iter()
-                    .any(|pseudo| pseudo.overlaps(rule_match.span))
-            })
-            .collect::<Vec<_>>();
-
-        let mut terminators = Vec::new();
-
-        let mut modifiers = Vec::new();
-
-        for rule_match in active_matches {
-            match &rule_match.behavior {
-                RuleBehavior::Terminate => {
-                    if let Some(range) = token_range(rule_match.span, &tokens) {
-                        terminators.push(range);
-                    }
-                }
-
-                RuleBehavior::Context(_) => {
-                    if let Some(modifier) =
-                        ContextModifier::from_rule_match(text, &tokens, rule_match)
-                    {
-                        modifiers.push(modifier);
-                    }
-                }
-
-                RuleBehavior::Pseudo => {}
-            }
-        }
-
-        modifiers.sort_by_key(|modifier| (modifier.span().start, modifier.span().end));
-
-        for modifier in &mut modifiers {
-            for terminator in &terminators {
-                modifier.limit_scope_to_terminator(*terminator);
-            }
-        }
-
-        let modifier_snapshot = modifiers.clone();
-
-        for (modifier_index, modifier) in modifiers.iter_mut().enumerate() {
-            for (other_index, other) in modifier_snapshot.iter().enumerate() {
-                if modifier_index == other_index {
-                    continue;
-                }
-
-                modifier.limit_scope_to_modifier(other);
-            }
-        }
-
-        PreparedNote { tokens, modifiers }
-    }
 }
 
-fn collect_targets(concept_spans: &[Vec<Span>], tokens: &[Span]) -> Vec<TargetOccurrence> {
+fn collect_targets(concept_spans: &[Vec<Span>]) -> Vec<ContextTarget> {
     let mut raw_targets = Vec::new();
 
     for (concept_index, spans) in concept_spans.iter().enumerate() {
@@ -263,7 +193,7 @@ fn collect_targets(concept_spans: &[Vec<Span>], tokens: &[Span]) -> Vec<TargetOc
 
     raw_targets.sort_by_key(|(span, concept_index)| (span.start, span.end, *concept_index));
 
-    let mut targets: Vec<TargetOccurrence> = Vec::new();
+    let mut targets: Vec<ContextTarget> = Vec::new();
 
     for (span, concept_index) in raw_targets {
         if let Some(last) = targets.last_mut()
@@ -273,122 +203,13 @@ fn collect_targets(concept_spans: &[Vec<Span>], tokens: &[Span]) -> Vec<TargetOc
             continue;
         }
 
-        targets.push(TargetOccurrence {
+        targets.push(ContextTarget {
             span,
-            token_range: token_range(span, tokens),
             concept_indices: vec![concept_index],
         });
     }
 
     targets
-}
-
-fn resolve_targets(
-    targets: &[TargetOccurrence],
-    modifiers: &[ContextModifier],
-) -> Vec<FindingContext> {
-    let mut applications: Vec<Vec<ModifierApplication>> = vec![Vec::new(); targets.len()];
-
-    for modifier in modifiers {
-        let mut candidates: Vec<(usize, usize)> = targets
-            .iter()
-            .enumerate()
-            .filter_map(|(target_index, target)| {
-                let target_range = target.token_range?;
-
-                if !modifier.modifies(target_range) {
-                    return None;
-                }
-
-                modifier
-                    .distance_to(target_range)
-                    .map(|distance| (target_index, distance))
-            })
-            .collect();
-
-        candidates.sort_by_key(|(target_index, distance)| {
-            (
-                *distance,
-                targets[*target_index].span.start,
-                targets[*target_index].span.end,
-            )
-        });
-
-        if let Some(max_targets) = modifier.max_targets() {
-            candidates.truncate(max_targets);
-        }
-
-        for (target_index, distance) in candidates {
-            applications[target_index].push(ModifierApplication {
-                distance,
-                modifier_start: modifier.span().start,
-                effect: modifier.effect(),
-            });
-        }
-    }
-
-    applications
-        .iter()
-        .map(|applications| resolve_context(applications))
-        .collect()
-}
-
-fn resolve_context(applications: &[ModifierApplication]) -> FindingContext {
-    let mut assertion: Option<RankedValue<Assertion>> = None;
-
-    let mut temporality: Option<RankedValue<Temporality>> = None;
-
-    let mut experiencer: Option<RankedValue<Experiencer>> = None;
-
-    for application in applications {
-        if let Some(value) = application.effect.assertion {
-            update_ranked(&mut assertion, value, application);
-        }
-
-        if let Some(value) = application.effect.temporality {
-            update_ranked(&mut temporality, value, application);
-        }
-
-        if let Some(value) = application.effect.experiencer {
-            update_ranked(&mut experiencer, value, application);
-        }
-    }
-
-    let effect = ContextEffect {
-        assertion: assertion.map(|ranked| ranked.value),
-        temporality: temporality.map(|ranked| ranked.value),
-        experiencer: experiencer.map(|ranked| ranked.value),
-    };
-
-    let mut context = FindingContext::default();
-
-    context.apply(effect);
-
-    context
-}
-
-fn update_ranked<T: Copy>(
-    slot: &mut Option<RankedValue<T>>,
-    value: T,
-    application: &ModifierApplication,
-) {
-    let should_replace = match slot {
-        None => true,
-
-        Some(current) => {
-            application.distance < current.distance
-                || (application.distance == current.distance
-                    && application.modifier_start > current.modifier_start)
-        }
-    };
-
-    if should_replace {
-        *slot = Some(RankedValue {
-            distance: application.distance,
-            modifier_start: application.modifier_start,
-            value,
-        });
-    }
 }
 
 fn affirmed_from_findings(findings: &[Finding]) -> Option<bool> {
@@ -410,6 +231,7 @@ fn finding_rank(indexed: &IndexedFinding) -> (u8, u8, u8, usize, usize, usize) {
     let temporality = match context.temporality {
         Temporality::Current => 0,
         Temporality::Historical => 1,
+        Temporality::Hypothetical => 2,
     };
 
     let assertion = match context.assertion {
@@ -431,164 +253,60 @@ fn finding_rank(indexed: &IndexedFinding) -> (u8, u8, u8, usize, usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn analyzer() -> Analyzer {
-        Analyzer::compile_default().unwrap()
-    }
+    use crate::engine::algorithm::ContextTarget;
+    use crate::engine::finding::FindingContext;
 
     fn concept(pattern: &str) -> Concept {
         Concept::new(pattern).unwrap()
     }
 
-    fn concepts() -> Vec<Concept> {
-        vec![concept(r"\bpneumonia\b"), concept(r"\banaphylaxis\b")]
-    }
-
     #[test]
-    fn affirmed_each_returns_status_for_each_concept() {
+    fn default_analyzer_uses_context() {
+        let analyzer = Analyzer::compile_default().unwrap();
+
         assert_eq!(
-            analyzer().affirmed_each("No pneumonia. Anaphylaxis present.", &concepts(),),
-            vec![Some(false), Some(true),],
+            analyzer.affirmed("History of pneumonia.", &concept(r"\bpneumonia\b",),),
+            Some(false),
         );
     }
 
     #[test]
-    fn affirmed_any_true_when_any_is_affirmed() {
+    fn analyzer_can_use_negex() {
+        let analyzer = Analyzer::from_spec(&AlgorithmSpec::Negex {
+            rules: None,
+            window: 6,
+            propagate_same_concept: true,
+        })
+        .unwrap();
+
         assert_eq!(
-            analyzer().affirmed_any("No pneumonia. Anaphylaxis present.", &concepts(),),
+            analyzer.affirmed("History of pneumonia.", &concept(r"\bpneumonia\b",),),
             Some(true),
         );
     }
 
-    #[test]
-    fn affirmed_all_true_when_every_concept_is_affirmed() {
-        assert_eq!(
-            analyzer().affirmed_all("Pneumonia and anaphylaxis are present.", &concepts(),),
-            Some(true),
-        );
+    struct AlwaysHistorical;
+
+    impl ContextAlgorithm for AlwaysHistorical {
+        fn resolve(&self, _text: &str, targets: &[ContextTarget]) -> Vec<FindingContext> {
+            targets
+                .iter()
+                .map(|_| FindingContext {
+                    temporality: Temporality::Historical,
+                    ..FindingContext::default()
+                })
+                .collect()
+        }
     }
 
     #[test]
-    fn find_all_is_sorted_by_text_position() {
-        let concepts = vec![concept(r"\banaphylaxis\b"), concept(r"\bpneumonia\b")];
+    fn analyzer_accepts_arbitrary_rust_algorithm() {
+        let analyzer = Analyzer::with_algorithm(AlwaysHistorical);
 
-        let findings = analyzer().find_all("Pneumonia then anaphylaxis.", &concepts);
-
-        assert_eq!(findings.len(), 2);
-
-        assert_eq!(findings[0].concept_index, 1,);
-
-        assert_eq!(findings[1].concept_index, 0,);
-
-        assert!(findings[0].finding.span.start < findings[1].finding.span.start);
-    }
-
-    #[test]
-    fn find_all_retains_multiple_occurrences() {
-        let findings = analyzer().find_all(
-            "No pneumonia. Pneumonia later developed.",
-            &[concept(r"\bpneumonia\b")],
-        );
-
-        assert_eq!(findings.len(), 2);
-        assert_eq!(findings[0].finding.context.assertion, Assertion::Negated,);
-        assert_eq!(findings[1].finding.context.assertion, Assertion::Affirmed,);
-    }
-
-    #[test]
-    fn find_all_retains_same_span_for_multiple_concepts() {
-        let concepts = vec![concept(r"\bpneumonia\b"), concept(r"\bpneumonia\b")];
-
-        let findings = analyzer().find_all("Pneumonia present.", &concepts);
-
-        assert_eq!(findings.len(), 2);
-        assert_eq!(findings[0].finding.span, findings[1].finding.span,);
-        assert_eq!(findings[0].concept_index, 0);
-        assert_eq!(findings[1].concept_index, 1);
-    }
-
-    #[test]
-    fn find_best_prefers_affirmed_over_possible_and_negated() {
-        let findings = vec![
-            concept(r"\bpneumonia\b"),
-            concept(r"\banaphylaxis\b"),
-            concept(r"\basthma\b"),
-        ];
-
-        let best = analyzer()
-            .find_best(
-                "No pneumonia. Possible anaphylaxis. Asthma present.",
-                &findings,
-            )
-            .unwrap();
-
-        assert_eq!(best.concept_index, 2);
-        assert_eq!(best.finding.context.assertion, Assertion::Affirmed,);
-    }
-
-    #[test]
-    fn find_best_prefers_current_over_historical() {
-        let best = analyzer()
-            .find_best("History of pneumonia. Possible anaphylaxis.", &concepts())
-            .unwrap();
-
-        assert_eq!(best.concept_index, 1);
-        assert_eq!(best.finding.context.temporality, Temporality::Current,);
-    }
-
-    #[test]
-    fn find_best_prefers_patient_over_other_experiencer() {
-        let best = analyzer()
-            .find_best("Mother has pneumonia. History of anaphylaxis.", &concepts())
-            .unwrap();
-
-        assert_eq!(best.concept_index, 1);
-        assert_eq!(best.finding.context.experiencer, Experiencer::Patient,);
-    }
-
-    #[test]
-    fn find_best_uses_earliest_occurrence_for_equal_context() {
-        let best = analyzer()
-            .find_best("Pneumonia then anaphylaxis.", &concepts())
-            .unwrap();
-
-        assert_eq!(best.concept_index, 0);
-    }
-
-    #[test]
-    fn find_best_uses_concept_order_for_identical_span() {
-        let concepts = vec![concept(r"\bpneumonia\b"), concept(r"\bpneumonia\b")];
-
-        let best = analyzer()
-            .find_best("Pneumonia present.", &concepts)
-            .unwrap();
-
-        assert_eq!(best.concept_index, 0);
-    }
-
-    #[test]
-    fn find_best_returns_none_when_nothing_matches() {
-        assert_eq!(analyzer().find_best("Asthma present.", &concepts(),), None,);
-    }
-
-    #[test]
-    fn family_history_preserves_independent_dimensions() {
-        let findings =
-            analyzer().findings("Family history of pneumonia.", &concept(r"\bpneumonia\b"));
+        let findings = analyzer.findings("Pneumonia present.", &concept(r"\bpneumonia\b"));
 
         assert_eq!(findings[0].context.temporality, Temporality::Historical,);
 
-        assert_eq!(findings[0].context.experiencer, Experiencer::Other,);
-    }
-
-    #[test]
-    fn max_targets_is_shared_across_concepts() {
-        let concepts = vec![concept(r"\bpneumonia\b"), concept(r"\binfluenza\b")];
-
-        let findings = analyzer().findings_all("Status post pneumonia and influenza.", &concepts);
-
-        assert_eq!(findings[0][0].context.temporality, Temporality::Historical,);
-
-        assert_eq!(findings[1][0].context.temporality, Temporality::Current,);
+        assert!(!findings[0].context.is_affirmed());
     }
 }

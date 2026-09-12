@@ -1,111 +1,195 @@
 use crate::engine::finding::{Assertion, ContextEffect};
 use crate::engine::rule::{ContextOptions, ContextRule, Direction};
 
-fn effect(assertion: Assertion) -> ContextEffect {
-    ContextEffect::new().with_assertion(assertion)
+fn negated() -> ContextEffect {
+    ContextEffect::new().with_assertion(Assertion::Negated)
 }
 
-fn options(assertion: Assertion, max_scope: Option<usize>) -> ContextOptions {
-    let terminated_by = match assertion {
-        Assertion::Affirmed => {
-            vec![effect(Assertion::Negated), effect(Assertion::Possible)]
-        }
-
-        Assertion::Possible => {
-            vec![effect(Assertion::Affirmed), effect(Assertion::Negated)]
-        }
-
-        Assertion::Negated => {
-            vec![effect(Assertion::Affirmed), effect(Assertion::Possible)]
-        }
-    };
-
-    ContextOptions {
-        max_scope,
-        max_targets: None,
-        terminated_by,
-    }
+fn possible() -> ContextEffect {
+    ContextEffect::new().with_assertion(Assertion::Possible)
 }
 
-fn context_rule(
-    pattern: &str,
-    direction: Direction,
-    assertion: Assertion,
-    max_scope: Option<usize>,
-) -> ContextRule {
-    ContextRule::context(
-        pattern,
-        direction,
-        effect(assertion),
-        options(assertion, max_scope),
-    )
-}
+/// Default negation modifier rules.
+pub fn negation_rules() -> Vec<ContextRule> {
+    let effect = negated();
 
-pub fn rules() -> Vec<ContextRule> {
     vec![
-        context_rule(r"\bno\b", Direction::Forward, Assertion::Negated, None),
-        context_rule(r"\bnot\b", Direction::Forward, Assertion::Negated, None),
-        context_rule(r"\bwithout\b", Direction::Forward, Assertion::Negated, None),
-        context_rule(r"\bdenies?\b", Direction::Forward, Assertion::Negated, None),
-        context_rule(
+        ContextRule::context(
+            r"\bno\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bnot\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bwithout\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bden(?:y|ies|ied|ying)\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\babsence\W+of\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bfree\W+of\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
             r"\bnegative\W+for\b",
             Direction::Forward,
-            Assertion::Negated,
-            None,
+            effect,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bruled\W+out\b",
+        ContextRule::context(
+            r"\bno\W+evidence(?:\W+of)?\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bno\W+signs?\W+of\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\b(?:is|are|was|were)\W+ruled\W+out\b",
             Direction::Backward,
-            Assertion::Negated,
-            None,
+            effect,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bnot\W+(?:seen|present|identified)\b",
+        ContextRule::context(
+            r"\b(?:not\W+seen|not\W+present|not\W+identified)\b",
             Direction::Backward,
-            Assertion::Negated,
-            Some(5),
+            effect,
+            ContextOptions::default(),
         ),
-        context_rule(
+    ]
+}
+
+pub fn context_possible_rules() -> Vec<ContextRule> {
+    let possible = ContextEffect::new().with_assertion(Assertion::Possible);
+
+    vec![
+        ContextRule::context(
             r"\bpossible\b",
             Direction::Forward,
-            Assertion::Possible,
-            None,
+            possible,
+            ContextOptions::default(),
         ),
-        context_rule(
+        ContextRule::context(
             r"\bpossibly\b",
             Direction::Forward,
-            Assertion::Possible,
-            None,
+            possible,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bconcern\W+for\b",
+        ContextRule::context(
+            r"\bprobable\b",
             Direction::Forward,
-            Assertion::Possible,
-            None,
+            possible,
+            ContextOptions::default(),
         ),
-        context_rule(
+        ContextRule::context(
+            r"\bprobably\b",
+            Direction::Forward,
+            possible,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\blikely\b",
+            Direction::Forward,
+            possible,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bconcern(?:ed)?\W+(?:for|about)\b",
+            Direction::Forward,
+            possible,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bsuspicious\W+for\b",
+            Direction::Forward,
+            possible,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bsuggestive\W+of\b",
+            Direction::Forward,
+            possible,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
             r"\brule\W+out\b",
             Direction::Forward,
-            Assertion::Possible,
-            None,
+            possible,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bcannot\W+exclude\b",
+        ContextRule::context(
+            r"\br\s*/\s*o\b",
             Direction::Forward,
-            Assertion::Possible,
-            None,
+            possible,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bsuspected\b",
-            Direction::Bidirectional,
-            Assertion::Possible,
-            Some(3),
+        ContextRule::context(
+            r"\bcannot\W+(?:be\W+)?(?:excluded|ruled\W+out)\b",
+            Direction::Backward,
+            possible,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bpositive\W+for\b",
+        ContextRule::context(
+            r"\bnot\W+(?:been\W+)?ruled\W+out\b",
+            Direction::Backward,
+            possible,
+            ContextOptions::default(),
+        ),
+    ]
+}
+
+/// Default NegEx-style conditional-possibility rules.
+pub fn negex_possible_rules() -> Vec<ContextRule> {
+    let effect = possible();
+
+    vec![
+        ContextRule::context(
+            r"\brule\W+out\b",
             Direction::Forward,
-            Assertion::Affirmed,
-            None,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\br\s*/\s*o\b",
+            Direction::Forward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\b(?:should|may|might|could|must)\W+be\W+ruled\W+out\b",
+            Direction::Backward,
+            effect,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bnot\W+(?:been\W+)?ruled\W+out\b",
+            Direction::Backward,
+            effect,
+            ContextOptions::default(),
         ),
     ]
 }
@@ -113,84 +197,15 @@ pub fn rules() -> Vec<ContextRule> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::rule::{RuleBehavior, RuleSet};
+    use crate::engine::rule::RuleSet;
 
     #[test]
-    fn assertion_rules_compile() {
-        assert!(RuleSet::compile(&rules(),).is_ok());
+    fn negation_rules_compile() {
+        assert!(RuleSet::compile(&negation_rules(),).is_ok());
     }
 
     #[test]
-    fn no_is_forward_negation() {
-        let rules = rules();
-
-        let rule = rules.iter().find(|rule| rule.pattern == r"\bno\b").unwrap();
-
-        let RuleBehavior::Context(behavior) = &rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert_eq!(behavior.direction, Direction::Forward,);
-
-        assert_eq!(behavior.effect, effect(Assertion::Negated,),);
-    }
-
-    #[test]
-    fn negation_is_terminated_by_possible() {
-        let rules = rules();
-
-        let rule = rules.iter().find(|rule| rule.pattern == r"\bno\b").unwrap();
-
-        let RuleBehavior::Context(behavior) = &rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert!(
-            behavior
-                .options
-                .terminated_by
-                .contains(&effect(Assertion::Possible,),)
-        );
-    }
-
-    #[test]
-    fn ruled_out_is_backward() {
-        let rules = rules();
-
-        let rule = rules
-            .iter()
-            .find(|rule| rule.pattern == r"\bruled\W+out\b")
-            .unwrap();
-
-        let RuleBehavior::Context(behavior) = &rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert_eq!(behavior.direction, Direction::Backward,);
-    }
-
-    #[test]
-    fn positive_for_is_explicit_affirmation() {
-        let rules = rules();
-
-        let rule = rules
-            .iter()
-            .find(|rule| rule.pattern == r"\bpositive\W+for\b")
-            .unwrap();
-
-        let RuleBehavior::Context(behavior) = &rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert_eq!(behavior.effect, effect(Assertion::Affirmed,),);
-    }
-
-    #[test]
-    fn assertion_rules_match_expected_text() {
-        let matches = RuleSet::compile(&rules())
-            .unwrap()
-            .find_matches("No fever. Possible pneumonia. Influenza ruled out.");
-
-        assert_eq!(matches.len(), 3,);
+    fn possibility_rules_compile() {
+        assert!(RuleSet::compile(&negex_possible_rules(),).is_ok());
     }
 }

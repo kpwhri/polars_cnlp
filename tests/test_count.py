@@ -2,7 +2,7 @@ import polars as pl
 import polars_cnlp
 
 
-def test_count_no_mentions() -> None:
+def test_count_no_mentions():
     df = pl.DataFrame({
         'note_text': ['Patient has asthma.'],
     })
@@ -16,7 +16,7 @@ def test_count_no_mentions() -> None:
     assert result['count'].to_list() == [0]
 
 
-def test_count_one_mention() -> None:
+def test_count_one_mention():
     df = pl.DataFrame({
         'note_text': ['Patient has pneumonia.'],
     })
@@ -30,7 +30,7 @@ def test_count_one_mention() -> None:
     assert result['count'].to_list() == [1]
 
 
-def test_count_multiple_mentions() -> None:
+def test_count_multiple_mentions():
     df = pl.DataFrame({
         'note_text': [
             'Pneumonia suspected, and pneumonia confirmed.',
@@ -46,7 +46,7 @@ def test_count_multiple_mentions() -> None:
     assert result['count'].to_list() == [2]
 
 
-def test_count_preserves_null() -> None:
+def test_count_preserves_null():
     df = pl.DataFrame(
         {
             'note_text': [None],

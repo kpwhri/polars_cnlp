@@ -3,19 +3,19 @@ use pyo3_polars::derive::polars_expr;
 
 use crate::engine::count;
 
-use super::terms::{TermsKwargs, build_u32_struct, compile_concepts, struct_output_field};
+use super::terms::{TermsKwargs, build_u32_struct, compile_concepts, labels, struct_output_field};
 
 fn count_all_output(input_fields: &[Field], kwargs: TermsKwargs) -> PolarsResult<Field> {
-    struct_output_field(input_fields, &kwargs, DataType::UInt32)
+    struct_output_field(input_fields, &kwargs.terms, DataType::UInt32)
 }
 
 #[polars_expr(output_type_func_with_kwargs=count_all_output)]
 fn count_all_concepts(inputs: &[Series], kwargs: TermsKwargs) -> PolarsResult<Series> {
     let text = inputs[0].str()?;
 
-    let concepts = compile_concepts(&kwargs)?;
+    let concepts = compile_concepts(&kwargs.terms)?;
 
-    let labels = kwargs.labels();
+    let labels = labels(&kwargs.terms);
 
     let mut columns: Vec<Vec<Option<u32>>> = (0..concepts.len())
         .map(|_| Vec::with_capacity(text.len()))

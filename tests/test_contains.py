@@ -12,7 +12,7 @@ def test_contains_target():
 
     result = df.select(
         pl.col('note_text')
-        .cnlp.contains('pneumonia')
+        .rdw.contains('pneumonia')
         .alias('result')
     )
 
@@ -29,7 +29,7 @@ def test_contains_preserves_null():
 
     result = df.select(
         pl.col('note_text')
-        .cnlp.contains('pneumonia')
+        .rdw.contains('pneumonia')
         .alias('result')
     )
 
@@ -47,7 +47,7 @@ def test_contains_lazy():
         .lazy()
         .with_columns(
             pl.col('note_text')
-            .cnlp.contains('pneumonia')
+            .rdw.contains('pneumonia')
             .alias('result')
         )
     )

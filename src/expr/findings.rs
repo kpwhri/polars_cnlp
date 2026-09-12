@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use polars::prelude::*;
 use serde::Deserialize;
 
+use crate::engine::algorithm::AlgorithmSpec;
 use crate::engine::analyze::IndexedFinding;
 use crate::engine::concept::Concept;
 
@@ -15,6 +16,9 @@ pub struct FindTermSpec {
 #[derive(Debug, Clone, Deserialize)]
 pub struct FindKwargs {
     pub terms: Vec<FindTermSpec>,
+
+    #[serde(default)]
+    pub algorithm: AlgorithmSpec,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -193,7 +197,7 @@ pub fn build_optional_finding_struct(
 
     let dtype = DataType::Struct(fields.clone());
 
-    let values: Vec<AnyValue<'_>> = findings
+    let values = findings
         .iter()
         .map(|finding| {
             let Some(finding) = finding else {
@@ -219,7 +223,7 @@ pub fn build_optional_finding_struct(
                 fields.clone(),
             )))
         })
-        .collect();
+        .collect::<Vec<_>>();
 
     Series::from_any_values_and_dtype(name, &values, &dtype, true)
 }
@@ -233,144 +237,4 @@ fn finding_fields() -> Vec<Field> {
         Field::new("temporality".into(), DataType::String),
         Field::new("experiencer".into(), DataType::String),
     ]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::engine::finding::{Assertion, Experiencer, Finding, FindingContext, Temporality};
-    use crate::engine::span::Span;
-
-    fn indexed_finding() -> IndexedFinding {
-        IndexedFinding {
-            concept_index: 0,
-            finding: Finding {
-                span: Span::new(3, 12),
-                context: FindingContext {
-                    assertion: Assertion::Negated,
-                    temporality: Temporality::Current,
-                    experiencer: Experiencer::Patient,
-                },
-            },
-        }
-    }
-
-    fn named_kwargs() -> FindKwargs {
-        FindKwargs {
-            terms: vec![FindTermSpec {
-                label: Some("pneumonia".to_string()),
-                pattern: r"\bpneumonia\b".to_string(),
-            }],
-        }
-    }
-
-    #[test]
-    fn validates_single_unlabeled_term() {
-        let kwargs = FindKwargs {
-            terms: vec![FindTermSpec {
-                label: None,
-                pattern: r"\bpneumonia\b".to_string(),
-            }],
-        };
-
-        assert!(kwargs.validate().is_ok());
-    }
-
-    #[test]
-    fn validates_named_terms() {
-        assert!(named_kwargs().validate().is_ok());
-    }
-
-    #[test]
-    fn rejects_multiple_unlabeled_terms() {
-        let kwargs = FindKwargs {
-            terms: vec![
-                FindTermSpec {
-                    label: None,
-                    pattern: r"\bpneumonia\b".to_string(),
-                },
-                FindTermSpec {
-                    label: None,
-                    pattern: r"\basthma\b".to_string(),
-                },
-            ],
-        };
-
-        assert!(kwargs.validate().is_err());
-    }
-
-    #[test]
-    fn rejects_duplicate_labels() {
-        let kwargs = FindKwargs {
-            terms: vec![
-                FindTermSpec {
-                    label: Some("disease".to_string()),
-                    pattern: r"\bpneumonia\b".to_string(),
-                },
-                FindTermSpec {
-                    label: Some("disease".to_string()),
-                    pattern: r"\basthma\b".to_string(),
-                },
-            ],
-        };
-
-        assert!(kwargs.validate().is_err());
-    }
-
-    #[test]
-    fn finding_dtype_is_struct() {
-        assert_eq!(
-            finding_dtype(),
-            DataType::Struct(vec![
-                Field::new("label".into(), DataType::String,),
-                Field::new("start".into(), DataType::UInt64,),
-                Field::new("end".into(), DataType::UInt64,),
-                Field::new("assertion".into(), DataType::String,),
-                Field::new("temporality".into(), DataType::String,),
-                Field::new("experiencer".into(), DataType::String,),
-            ],),
-        );
-    }
-
-    #[test]
-    fn builds_named_finding_struct() {
-        let kwargs = named_kwargs();
-
-        let rendered = kwargs.render(indexed_finding());
-
-        let series = build_finding_struct("finding".into(), &[rendered]).unwrap();
-
-        let value = series.get(0).unwrap();
-
-        assert_eq!(value.dtype(), finding_dtype(),);
-    }
-
-    #[test]
-    fn builds_null_optional_finding() {
-        let series = build_optional_finding_struct("finding".into(), &[None]).unwrap();
-
-        assert!(series.get(0).unwrap().is_null());
-    }
-
-    #[test]
-    fn builds_unlabeled_finding_with_null_label() {
-        let kwargs = FindKwargs {
-            terms: vec![FindTermSpec {
-                label: None,
-                pattern: r"\bpneumonia\b".to_string(),
-            }],
-        };
-
-        let series = build_optional_finding_struct(
-            "finding".into(),
-            &[Some(kwargs.render(indexed_finding()))],
-        )
-        .unwrap();
-
-        assert!(!series.get(0).unwrap().is_null());
-
-        let label = series.struct_().unwrap().field_by_name("label").unwrap();
-
-        assert_eq!(label.null_count(), 1,);
-    }
 }

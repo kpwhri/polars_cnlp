@@ -5,16 +5,15 @@ PNEUMONIA = r'\bpneumonia\b'
 
 
 def test_affirmed_truth_table():
-    df = pl.DataFrame(
-        {'note_text': [
-            'Patient has pneumonia.',
-            'No pneumonia.',
-            'Possible pneumonia.',
-            'History of pneumonia.',
-            'Family history of pneumonia.',
-            'Patient has asthma.',
-            None,
-        ]},
+    df = pl.DataFrame({'note_text': [
+        'Patient has pneumonia.',
+        'No pneumonia.',
+        'Possible pneumonia.',
+        'History of pneumonia.',
+        'Family history of pneumonia.',
+        'Patient has asthma.',
+        None,
+    ]},
         schema={
             'note_text': pl.String,
         },
@@ -27,7 +26,7 @@ def test_affirmed_truth_table():
     assert result['pneumonia'].to_list() == [True, False, False, False, False, None, None]
 
 
-def test_affirmed_respects_boundaries() -> None:
+def test_affirmed_respects_boundaries():
     df = pl.DataFrame({'note_text': [
         'No fever. Pneumonia present.',
         'No fever but pneumonia present.',
@@ -42,7 +41,7 @@ def test_affirmed_respects_boundaries() -> None:
     assert result['pneumonia'].to_list() == [True, True]
 
 
-def test_affirmed_respects_pseudo_rules() -> None:
+def test_affirmed_respects_pseudo_rules():
     df = pl.DataFrame({'note_text': [
         'Not only pneumonia was documented.',
     ]})
@@ -56,7 +55,7 @@ def test_affirmed_respects_pseudo_rules() -> None:
     assert result['pneumonia'].to_list() == [True]
 
 
-def test_affirmed_handles_competing_assertion_rules() -> None:
+def test_affirmed_handles_competing_assertion_rules():
     df = pl.DataFrame({'note_text': [
         'No possible pneumonia.',
         'Possible no pneumonia.',
@@ -71,7 +70,7 @@ def test_affirmed_handles_competing_assertion_rules() -> None:
     assert result['pneumonia'].to_list() == [False, False]
 
 
-def test_affirmed_any_positive_occurrence_wins() -> None:
+def test_affirmed_any_positive_occurrence_wins():
     df = pl.DataFrame({'note_text': [
         'No pneumonia initially. Pneumonia developed later.',
     ]})
@@ -85,7 +84,7 @@ def test_affirmed_any_positive_occurrence_wins() -> None:
     assert result['pneumonia'].to_list() == [True]
 
 
-def test_affirmed_works_lazily() -> None:
+def test_affirmed_works_lazily():
     result = (
         pl.DataFrame({'note_text': [
             'No pneumonia.',

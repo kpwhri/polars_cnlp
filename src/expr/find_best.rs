@@ -1,8 +1,7 @@
 use polars::prelude::*;
 use pyo3_polars::derive::polars_expr;
 
-use crate::engine::analyze::Analyzer;
-
+use super::algorithm::build_analyzer;
 use super::findings::{
     FindKwargs, build_optional_finding_struct, compile_find_concepts, find_best_output,
 };
@@ -13,13 +12,7 @@ fn find_best_concept(inputs: &[Series], kwargs: FindKwargs) -> PolarsResult<Seri
 
     let concepts = compile_find_concepts(&kwargs)?;
 
-    let analyzer = Analyzer::compile_default().map_err(|error| {
-        polars_err!(
-            ComputeError:
-            "failed to compile CNLP context rules: {}",
-            error
-        )
-    })?;
+    let analyzer = build_analyzer(&kwargs.algorithm)?;
 
     let findings = text
         .iter()

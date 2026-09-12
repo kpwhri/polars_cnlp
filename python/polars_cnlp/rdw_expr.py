@@ -101,3 +101,13 @@ class ResearchDataWranglingExpr:
             kwargs={'prefixes': prefixes},
             is_elementwise=True,
         )
+
+    def contains(self, pattern: str) -> pl.Expr:
+        """Check whether the text contains a regular expression."""
+        return register_plugin_function(
+            plugin_path=_PLUGIN_PATH,
+            function_name='contains_target',
+            args=[self._expr],
+            kwargs={'pattern': pattern},
+            is_elementwise=True,
+        )

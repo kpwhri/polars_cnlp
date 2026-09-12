@@ -1,3 +1,4 @@
+pub mod algorithm;
 pub mod analyze;
 pub mod boundary;
 pub mod concept;

@@ -39,11 +39,9 @@ def test_find_all_with_mapping():
         'anaphylaxis': r'\banaphylaxis\b',
     }
 
-    result = pl.DataFrame(
-        {'note_text': [
-            'No pneumonia. Possible anaphylaxis.',
-        ]},
-    ).select(
+    result = pl.DataFrame({'note_text': [
+        'No pneumonia. Possible anaphylaxis.',
+    ]}).select(
         pl.col('note_text').cnlp.find_all(terms).alias('findings'),
     )
 

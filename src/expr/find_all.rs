@@ -2,8 +2,9 @@ use polars::chunked_array::builder::get_list_builder;
 use polars::prelude::*;
 use pyo3_polars::derive::polars_expr;
 
-use crate::engine::analyze::{Analyzer, IndexedFinding};
+use crate::engine::analyze::IndexedFinding;
 
+use super::algorithm::build_analyzer;
 use super::findings::{
     FindKwargs, build_finding_struct, compile_find_concepts, find_all_output, finding_dtype,
 };
@@ -20,13 +21,7 @@ fn find_all_concepts(inputs: &[Series], kwargs: FindKwargs) -> PolarsResult<Seri
 
     let concepts = compile_find_concepts(&kwargs)?;
 
-    let analyzer = Analyzer::compile_default().map_err(|error| {
-        polars_err!(
-            ComputeError:
-            "failed to compile CNLP context rules: {}",
-            error
-        )
-    })?;
+    let analyzer = build_analyzer(&kwargs.algorithm)?;
 
     let mut flat_findings: Vec<IndexedFinding> = Vec::new();
 

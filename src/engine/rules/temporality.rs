@@ -1,100 +1,140 @@
 use crate::engine::finding::{ContextEffect, Temporality};
 use crate::engine::rule::{ContextOptions, ContextRule, Direction};
 
-fn effect(temporality: Temporality) -> ContextEffect {
-    ContextEffect::new().with_temporality(temporality)
+fn historical() -> ContextEffect {
+    ContextEffect::new().with_temporality(Temporality::Historical)
 }
 
-fn options(
-    temporality: Temporality,
-    max_scope: Option<usize>,
-    max_targets: Option<usize>,
-) -> ContextOptions {
-    let opposite = match temporality {
-        Temporality::Current => Temporality::Historical,
-
-        Temporality::Historical => Temporality::Current,
-    };
-
-    ContextOptions {
-        max_scope,
-        max_targets,
-        terminated_by: vec![effect(opposite)],
-    }
+fn hypothetical() -> ContextEffect {
+    ContextEffect::new().with_temporality(Temporality::Hypothetical)
 }
 
-fn context_rule(
-    pattern: &str,
-    direction: Direction,
-    temporality: Temporality,
-    max_scope: Option<usize>,
-    max_targets: Option<usize>,
-) -> ContextRule {
-    ContextRule::context(
-        pattern,
-        direction,
-        effect(temporality),
-        options(temporality, max_scope, max_targets),
-    )
-}
-
+/// Default ConText temporality rules.
 pub fn rules() -> Vec<ContextRule> {
+    let historical = historical();
+    let hypothetical = hypothetical();
+
     vec![
-        context_rule(
+        ContextRule::context(
             r"\bhistory\W+of\b",
             Direction::Forward,
-            Temporality::Historical,
-            None,
-            None,
+            historical,
+            ContextOptions::default(),
         ),
-        context_rule(
+        ContextRule::context(
+            r"\bhx\W+of\b",
+            Direction::Forward,
+            historical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bpast\W+history\W+of\b",
+            Direction::Forward,
+            historical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
             r"\bprior\b",
             Direction::Forward,
-            Temporality::Historical,
-            Some(5),
-            None,
+            historical,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bprevious\b",
+        ContextRule::context(
+            r"\bprevious(?:ly)?\b",
             Direction::Forward,
-            Temporality::Historical,
-            Some(5),
-            None,
+            historical,
+            ContextOptions::default(),
         ),
-        context_rule(
+        ContextRule::context(
+            r"\bremote\b",
+            Direction::Forward,
+            historical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bpre[\W_]*existing\b",
+            Direction::Forward,
+            historical,
+            ContextOptions {
+                max_targets: Some(1),
+                ..ContextOptions::default()
+            },
+        ),
+        ContextRule::context(
             r"\bstatus\W+post\b",
             Direction::Forward,
-            Temporality::Historical,
-            None,
-            Some(1),
+            historical,
+            ContextOptions {
+                max_targets: Some(1),
+                ..ContextOptions::default()
+            },
         ),
-        context_rule(
+        ContextRule::context(
             r"\bs\s*/\s*p\b",
             Direction::Forward,
-            Temporality::Historical,
-            None,
-            Some(1),
+            historical,
+            ContextOptions {
+                max_targets: Some(1),
+                ..ContextOptions::default()
+            },
         ),
-        context_rule(
-            r"\bpresent(?:ing|s|ed)\b",
+        ContextRule::context(
+            r"\b(?:1[5-9]|[2-9]\d|\d{3,})\W+days?\W+ago\b",
             Direction::Forward,
-            Temporality::Current,
-            None,
-            None,
+            historical,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\bcurrently\b",
+        ContextRule::context(
+            r"\b(?:[3-9]|\d{2,})\W+weeks?\W+ago\b",
             Direction::Forward,
-            Temporality::Current,
-            Some(5),
-            None,
+            historical,
+            ContextOptions::default(),
         ),
-        context_rule(
-            r"\brecent(?:ly)?\b",
+        ContextRule::context(
+            r"\b\d+\W+(?:months?|years?)\W+ago\b",
             Direction::Forward,
-            Temporality::Current,
-            Some(5),
-            None,
+            historical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bif\b",
+            Direction::Forward,
+            hypothetical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bshould\b",
+            Direction::Forward,
+            hypothetical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bmay\b",
+            Direction::Forward,
+            hypothetical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bmight\b",
+            Direction::Forward,
+            hypothetical,
+            ContextOptions::default(),
+        ),
+        ContextRule::context(
+            r"\bcould\b",
+            Direction::Forward,
+            hypothetical,
+            ContextOptions::default(),
+        ),
+        ContextRule::pseudo_effects(r"\bhistory\W+exam\b", vec![historical]),
+        ContextRule::pseudo_effects(r"\bsocial\W+history\b", vec![historical]),
+        ContextRule::pseudo_effects(r"\bpoor\W+histor(?:y|ian)\b", vec![historical]),
+        ContextRule::pseudo_effects(r"\bif\W+negative\b", vec![hypothetical]),
+        ContextRule::pseudo_effects(r"\bknow\W+if\b", vec![hypothetical]),
+        ContextRule::terminate_effects(r"\bpresent(?:s|ed|ing)?\b", vec![historical, hypothetical]),
+        ContextRule::terminate_effects(
+            r"\b(?:currently|today|now|recently)\b",
+            vec![historical, hypothetical],
         ),
     ]
 }
@@ -102,7 +142,7 @@ pub fn rules() -> Vec<ContextRule> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::rule::{RuleBehavior, RuleSet};
+    use crate::engine::rule::RuleSet;
 
     #[test]
     fn temporality_rules_compile() {
@@ -110,63 +150,13 @@ mod tests {
     }
 
     #[test]
-    fn history_of_is_historical() {
-        let rule = rules()
-            .into_iter()
-            .find(|rule| rule.pattern == r"\bhistory\W+of\b")
-            .unwrap();
+    fn historical_single_target_rules_exist() {
+        assert!(rules().iter().any(|rule| {
+            let crate::engine::rule::RuleBehavior::Context(behavior) = &rule.behavior else {
+                return false;
+            };
 
-        let RuleBehavior::Context(behavior) = rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert_eq!(behavior.effect, effect(Temporality::Historical,),);
-    }
-
-    #[test]
-    fn presenting_is_current() {
-        let rule = rules()
-            .into_iter()
-            .find(|rule| rule.pattern == r"\bpresent(?:ing|s|ed)\b")
-            .unwrap();
-
-        let RuleBehavior::Context(behavior) = rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert_eq!(behavior.effect, effect(Temporality::Current,),);
-    }
-
-    #[test]
-    fn status_post_modifies_one_target() {
-        let rule = rules()
-            .into_iter()
-            .find(|rule| rule.pattern == r"\bstatus\W+post\b")
-            .unwrap();
-
-        let RuleBehavior::Context(behavior) = rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert_eq!(behavior.options.max_targets, Some(1),);
-    }
-
-    #[test]
-    fn historical_and_current_effects_terminate_each_other() {
-        let rule = rules()
-            .into_iter()
-            .find(|rule| rule.pattern == r"\bhistory\W+of\b")
-            .unwrap();
-
-        let RuleBehavior::Context(behavior) = rule.behavior else {
-            panic!("expected context rule");
-        };
-
-        assert!(
-            behavior
-                .options
-                .terminated_by
-                .contains(&effect(Temporality::Current,),)
-        );
+            behavior.options.max_targets == Some(1)
+        },));
     }
 }
