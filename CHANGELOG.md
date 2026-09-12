@@ -11,5 +11,4 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Base implementation for negex/context for concept detection in text
 - Useful data wrangling extension expressions to `polars` for `starts_with_any` and `ends_with_any`
-
- 
+- Github setup + pypi releases

@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.target }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target:
+          - x86_64
+          - aarch64
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          manylinux: 2_17
+          args: >-
+            --release
+            --locked
+            --out dist
+            --compatibility pypi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.target }}
+          path: dist/*.whl
+
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          target: x64
+          args: >-
+            --release
+            --locked
+            --out dist
+            --compatibility pypi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-x64
+          path: dist/*.whl
+
+  macos:
+    name: macOS ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      matrix:
+        include:
+          - target: x86_64
+            runner: macos-13
+          - target: aarch64
+            runner: macos-14
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          args: >-
+            --release
+            --locked
+            --out dist
+            --compatibility pypi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-${{ matrix.target }}
+          path: dist/*.whl
+
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build source distribution
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs:
+      - linux
+      - windows
+      - macos
+      - sdist
+
+    environment:
+      name: pypi
+
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      - name: Show distributions
+        run: ls -lh dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
