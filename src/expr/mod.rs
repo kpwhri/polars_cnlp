@@ -1,0 +1,13 @@
+pub mod affirmed;
+pub mod affirmed_all;
+pub mod affirmed_any;
+pub mod affirmed_each;
+pub mod contains;
+pub mod count;
+pub mod count_all;
+pub mod ends_with_any;
+pub mod find_all;
+pub mod find_best;
+pub mod findings;
+pub mod starts_with_any;
+pub mod terms;

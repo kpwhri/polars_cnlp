@@ -1,0 +1,16 @@
+[package]
+name = "polars_cnlp"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "_polars_cnlp"
+crate-type = ["cdylib"]
+
+[dependencies]
+polars = { version = "0.55.2", features = ["dtype-struct"] }
+pyo3 = "0.29.2"
+pyo3-polars = { version = "0.28.0", features = ["derive"] }
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+aho-corasick = "1.1.5"
