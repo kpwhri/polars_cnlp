@@ -7,8 +7,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-11
+
 ### Added
 
 - Base implementation for negex/context for concept detection in text
 - Useful data wrangling extension expressions to `polars` for `starts_with_any` and `ends_with_any`
 - Github setup + pypi releases
+
+
+[unreleased]: https://github.com/kpwhri/polars_cnlp/compare/v0.1.0...HEAD
+
+[0.1.0]: https://github.com/kpwhri/polars_cnlp/releases/tag/v0.1.0
