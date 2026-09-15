@@ -282,9 +282,9 @@ experiencer = patient
 ```python
 affirmed(
     term: str,
-    *,
-    algorithm: AlgorithmLike = 'context',
-    prefilter: bool = False,
+*,
+algorithm: AlgorithmLike = 'context',
+prefilter: bool = False,
 ) -> pl.Expr
 ```
 
@@ -345,9 +345,9 @@ affirmed_notes = df.filter(
 ```python
 affirmed_any(
     terms: TermPatterns,
-    *,
-    algorithm: AlgorithmLike = 'context',
-    prefilter: bool = False,
+*,
+algorithm: AlgorithmLike = 'context',
+prefilter: bool = False,
 ) -> pl.Expr
 ```
 
@@ -425,9 +425,9 @@ cohort = df.filter(
 ```python
 affirmed_all(
     terms: TermPatterns,
-    *,
-    algorithm: AlgorithmLike = 'context',
-    prefilter: bool = False,
+*,
+algorithm: AlgorithmLike = 'context',
+prefilter: bool = False,
 ) -> pl.Expr
 ```
 
@@ -478,9 +478,9 @@ cohort = df.filter(
 ```python
 affirmed_each(
     terms: Mapping[str, str],
-    *,
-    algorithm: AlgorithmLike = 'context',
-    prefilter: bool = False,
+*,
+algorithm: AlgorithmLike = 'context',
+prefilter: bool = False,
 ) -> pl.Expr
 ```
 
@@ -571,9 +571,9 @@ Example:
 ```python
 find_best(
     terms: FindPatterns,
-    *,
-    algorithm: AlgorithmLike = 'context',
-    prefilter: bool = False,
+*,
+algorithm: AlgorithmLike = 'context',
+prefilter: bool = False,
 ) -> pl.Expr
 ```
 
@@ -633,9 +633,9 @@ Use cases:
 ```python
 find_all(
     terms: FindPatterns,
-    *,
-    algorithm: AlgorithmLike = 'context',
-    prefilter: bool = False,
+*,
+algorithm: AlgorithmLike = 'context',
+prefilter: bool = False,
 ) -> pl.Expr
 ```
 
@@ -828,7 +828,81 @@ from polars_cnlp.algorithms import (
 )
 ```
 
+## Add rules to the defaults
+
+Use `additional_rules=` when you want to keep the built-in ConText or NegEx rules and add only a few project-specific
+expressions.
+
+For example, extend ConText with an additional negation phrase:
+
+```python
+from polars_cnlp.algorithms import ConText, ContextEffect, ContextRule
+
+algorithm = ConText(
+    additional_rules=[
+        ContextRule(
+            pattern=r'\bfree\W+of\b',
+            direction='forward',
+            effect=ContextEffect(assertion='negated'),
+        ),
+    ],
+)
+
+result = df.select(
+    pl.col('note_text').cnlp.affirmed(
+        r'\bpneumonia\b',
+        algorithm=algorithm,
+    ),
+)
+```
+
+The built-in ConText rules remain active; the supplied rule is added to them.
+
+The same approach works with NegEx:
+
+```python
+from polars_cnlp.algorithms import NegEx, ContextEffect, ContextRule
+
+algorithm = NegEx(
+    additional_rules=[
+        ContextRule(
+            pattern=r'\bcovid\b',
+            direction='forward',
+            effect=ContextEffect(assertion='negated'),
+        ),
+    ],
+)
+
+result = df.select(
+    pl.col('note_text').cnlp.affirmed_each(
+        {
+            'pneumonia': r'\bpneumonia\b',
+            'anaphylaxis': r'\banaphylaxis\b',
+        },
+        algorithm=algorithm,
+    ),
+)
+```
+
+Use `additional_rules=` to extend the defaults. Use `rules=` instead when you want to replace the built-in rule set
+completely.
+
+```text
+ConText()                         -> built-in ConText rules
+ConText(additional_rules=[...])  -> built-in rules + additional rules
+ConText(rules=RuleSet([...]))    -> replacement rule set
+
+NegEx()                          -> built-in NegEx rules
+NegEx(additional_rules=[...])    -> built-in rules + additional rules
+NegEx(rules=RuleSet([...]))      -> replacement rule set
+```
+
+`rules=` and `additional_rules=` cannot be used together.
+
 ## Replace the ConText rule set
+
+Sometimes, we want a completely new set of rules. To do this, we'll create a new RuleSet and pass it to the algorithm
+constructor.
 
 ```python
 rules = RuleSet([
