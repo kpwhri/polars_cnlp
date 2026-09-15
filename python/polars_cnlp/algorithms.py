@@ -264,18 +264,27 @@ class ConText(Algorithm):
     ----------
     rules
         Replacement rule set. `None` uses the package default ConText rules.
+    additional_rules
+        Rules added to the package default ConText rules. Cannot be used with
+        `rules`.
     """
 
     rules: RuleSet | None = None
+    additional_rules: Sequence[Rule] = ()
+
+    def __post_init__(self):
+        additional_rules = tuple(self.additional_rules)
+
+        if self.rules is not None and additional_rules:
+            raise ValueError('rules and additional_rules cannot be used together')
+
+        object.__setattr__(self, 'additional_rules', additional_rules)
 
     def _to_spec(self) -> dict:
         return {
             'type': 'context',
-            'rules': (
-                None
-                if self.rules is None
-                else self.rules._to_spec()
-            ),
+            'rules': None if self.rules is None else self.rules._to_spec(),
+            'additional_rules': [rule._to_spec() for rule in self.additional_rules],
         }
 
 
@@ -287,6 +296,9 @@ class NegEx(Algorithm):
     ----------
     rules
         Replacement rule set. `None` uses the package default NegEx rules.
+    additional_rules
+        Rules added to the package default NegEx rules. Cannot be used with
+        `rules`.
     window
         Number of directional target positions. The published default is six,
         equivalent to zero through five intervening terms.
@@ -296,21 +308,26 @@ class NegEx(Algorithm):
     """
 
     rules: RuleSet | None = None
+    additional_rules: Sequence[Rule] = ()
     window: int = 6
     propagate_same_concept: bool = True
 
     def __post_init__(self):
+        additional_rules = tuple(self.additional_rules)
+
+        if self.rules is not None and additional_rules:
+            raise ValueError('rules and additional_rules cannot be used together')
+
         if self.window < 1:
             raise ValueError('window must be at least 1')
+
+        object.__setattr__(self, 'additional_rules', additional_rules)
 
     def _to_spec(self) -> dict:
         return {
             'type': 'negex',
-            'rules': (
-                None
-                if self.rules is None
-                else self.rules._to_spec()
-            ),
+            'rules': None if self.rules is None else self.rules._to_spec(),
+            'additional_rules': [rule._to_spec() for rule in self.additional_rules],
             'window': self.window,
             'propagate_same_concept': self.propagate_same_concept,
         }

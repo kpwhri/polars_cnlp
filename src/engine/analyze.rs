@@ -276,6 +276,7 @@ mod tests {
             rules: None,
             window: 6,
             propagate_same_concept: true,
+            additional_rules: Vec::new(),
         })
         .unwrap();
 

@@ -16,11 +16,17 @@ pub enum AlgorithmSpec {
     Context {
         #[serde(default)]
         rules: Option<Vec<RuleSpec>>,
+
+        #[serde(default)]
+        additional_rules: Vec<RuleSpec>,
     },
 
     Negex {
         #[serde(default)]
         rules: Option<Vec<RuleSpec>>,
+
+        #[serde(default)]
+        additional_rules: Vec<RuleSpec>,
 
         #[serde(default = "default_negex_window")]
         window: usize,
@@ -39,7 +45,10 @@ pub enum AlgorithmSpec {
 
 impl Default for AlgorithmSpec {
     fn default() -> Self {
-        Self::Context { rules: None }
+        Self::Context {
+            rules: None,
+            additional_rules: Vec::new(),
+        }
     }
 }
 
@@ -47,18 +56,19 @@ impl AlgorithmSpec {
     /// Build the configured runtime algorithm.
     pub fn build(&self) -> Result<Box<dyn ContextAlgorithm>, AlgorithmError> {
         match self {
-            Self::Context { rules } => {
-                let custom_rules = compile_optional_rules(rules)?;
+            Self::Context {
+                rules: replacement_rules,
+                additional_rules,
+            } => {
+                let resolved_rules =
+                    resolve_rules(replacement_rules, additional_rules, rules::context_rules)?;
 
-                match custom_rules {
-                    Some(rules) => Ok(Box::new(ConTextAlgorithm::compile(&rules)?)),
-
-                    None => Ok(Box::new(ConTextAlgorithm::compile_default()?)),
-                }
+                Ok(Box::new(ConTextAlgorithm::compile(&resolved_rules)?))
             }
 
             Self::Negex {
-                rules,
+                rules: replacement_rules,
+                additional_rules,
                 window,
                 propagate_same_concept,
             } => {
@@ -68,13 +78,11 @@ impl AlgorithmSpec {
                     ));
                 }
 
-                let rules = match compile_optional_rules(rules)? {
-                    Some(rules) => rules,
-                    None => rules::negex_rules(),
-                };
+                let resolved_rules =
+                    resolve_rules(replacement_rules, additional_rules, rules::negex_rules)?;
 
                 Ok(Box::new(NegExAlgorithm::compile(
-                    &rules,
+                    &resolved_rules,
                     *window,
                     *propagate_same_concept,
                 )?))
@@ -206,13 +214,28 @@ impl RuleSpec {
     }
 }
 
-fn compile_optional_rules(
-    rules: &Option<Vec<RuleSpec>>,
-) -> Result<Option<Vec<ContextRule>>, AlgorithmError> {
-    rules
-        .as_ref()
-        .map(|rules| compile_rule_specs(rules))
-        .transpose()
+fn resolve_rules(
+    replacement_rules: &Option<Vec<RuleSpec>>,
+    additional_rules: &[RuleSpec],
+    default_rules: fn() -> Vec<ContextRule>,
+) -> Result<Vec<ContextRule>, AlgorithmError> {
+    if replacement_rules.is_some() && !additional_rules.is_empty() {
+        return Err(AlgorithmError::InvalidConfig(
+            "rules and additional_rules cannot be used together".to_string(),
+        ));
+    }
+
+    match replacement_rules {
+        Some(replacement_rules) => compile_rule_specs(replacement_rules),
+
+        None => {
+            let mut rules = default_rules();
+
+            rules.extend(compile_rule_specs(additional_rules)?);
+
+            Ok(rules)
+        }
+    }
 }
 
 fn compile_rule_specs(rules: &[RuleSpec]) -> Result<Vec<ContextRule>, AlgorithmError> {
@@ -242,12 +265,31 @@ mod tests {
     use super::*;
     use crate::engine::finding::{Assertion, Temporality};
 
+    fn negation_rule(pattern: &str) -> RuleSpec {
+        RuleSpec::Context {
+            pattern: pattern.to_string(),
+            direction: Direction::Forward,
+            effect: ContextEffect::new().with_assertion(Assertion::Negated),
+            max_scope: None,
+            max_targets: None,
+            terminated_by: Vec::new(),
+        }
+    }
+
     #[test]
     fn context_is_default_algorithm() {
-        assert!(matches!(
-            AlgorithmSpec::default(),
-            AlgorithmSpec::Context { rules: None }
-        ));
+        let spec = AlgorithmSpec::default();
+
+        let AlgorithmSpec::Context {
+            rules,
+            additional_rules,
+        } = spec
+        else {
+            panic!("expected default ConText algorithm");
+        };
+
+        assert!(rules.is_none());
+        assert!(additional_rules.is_empty());
     }
 
     #[test]
@@ -260,6 +302,7 @@ mod tests {
         assert!(
             AlgorithmSpec::Negex {
                 rules: None,
+                additional_rules: Vec::new(),
                 window: 6,
                 propagate_same_concept: true,
             }
@@ -269,16 +312,62 @@ mod tests {
     }
 
     #[test]
-    fn custom_context_rules_replace_defaults() {
+    fn additional_context_rules_extend_defaults() {
+        let default_count = rules::context_rules().len();
+
+        let additional_rules = vec![negation_rule(r"\bcovid\b")];
+
+        let resolved = resolve_rules(&None, &additional_rules, rules::context_rules).unwrap();
+
+        assert_eq!(resolved.len(), default_count + 1,);
+    }
+
+    #[test]
+    fn additional_negex_rules_extend_defaults() {
+        let default_count = rules::negex_rules().len();
+
+        let additional_rules = vec![negation_rule(r"\bcovid\b")];
+
+        let resolved = resolve_rules(&None, &additional_rules, rules::negex_rules).unwrap();
+
+        assert_eq!(resolved.len(), default_count + 1,);
+    }
+
+    #[test]
+    fn replacement_rules_do_not_include_defaults() {
+        let replacement_rules = Some(vec![negation_rule(r"\bcovid\b")]);
+
+        let resolved = resolve_rules(&replacement_rules, &[], rules::negex_rules).unwrap();
+
+        assert_eq!(resolved.len(), 1,);
+    }
+
+    #[test]
+    fn replacement_and_additional_rules_are_rejected() {
+        let replacement_rules = Some(vec![negation_rule(r"\bcovid\b")]);
+
+        let additional_rules = vec![negation_rule(r"\babsence\b")];
+
+        assert!(resolve_rules(&replacement_rules, &additional_rules, rules::negex_rules,).is_err());
+    }
+
+    #[test]
+    fn builds_context_with_additional_rules() {
         let spec = AlgorithmSpec::Context {
-            rules: Some(vec![RuleSpec::Context {
-                pattern: r"\bremote\b".to_string(),
-                direction: Direction::Forward,
-                effect: ContextEffect::new().with_temporality(Temporality::Historical),
-                max_scope: None,
-                max_targets: None,
-                terminated_by: Vec::new(),
-            }]),
+            rules: None,
+            additional_rules: vec![negation_rule(r"\bcovid\b")],
+        };
+
+        assert!(spec.build().is_ok());
+    }
+
+    #[test]
+    fn builds_negex_with_additional_rules() {
+        let spec = AlgorithmSpec::Negex {
+            rules: None,
+            additional_rules: vec![negation_rule(r"\bcovid\b")],
+            window: 6,
+            propagate_same_concept: true,
         };
 
         assert!(spec.build().is_ok());
@@ -287,14 +376,7 @@ mod tests {
     #[test]
     fn builds_custom_rule_based_algorithm() {
         let spec = AlgorithmSpec::RuleBased {
-            rules: vec![RuleSpec::Context {
-                pattern: r"\babsent\b".to_string(),
-                direction: Direction::Forward,
-                effect: ContextEffect::new().with_assertion(Assertion::Negated),
-                max_scope: None,
-                max_targets: None,
-                terminated_by: Vec::new(),
-            }],
+            rules: vec![negation_rule(r"\babsent\b")],
             window: None,
         };
 
@@ -322,10 +404,28 @@ mod tests {
     fn rejects_zero_negex_window() {
         let spec = AlgorithmSpec::Negex {
             rules: None,
+            additional_rules: Vec::new(),
             window: 0,
             propagate_same_concept: true,
         };
 
         assert!(spec.build().is_err());
+    }
+
+    #[test]
+    fn custom_temporality_rule_builds() {
+        let spec = AlgorithmSpec::Context {
+            rules: None,
+            additional_rules: vec![RuleSpec::Context {
+                pattern: r"\bremote\b".to_string(),
+                direction: Direction::Forward,
+                effect: ContextEffect::new().with_temporality(Temporality::Historical),
+                max_scope: None,
+                max_targets: None,
+                terminated_by: Vec::new(),
+            }],
+        };
+
+        assert!(spec.build().is_ok());
     }
 }
