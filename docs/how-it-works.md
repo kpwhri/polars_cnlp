@@ -1,6 +1,6 @@
 ---
 layout: page
-title: How `polars-cnlp` Works
+title: How polars-cnlp Works
 ---
 
 `polars-cnlp` is designed as a Polars expression extension rather than a separate note-processing framework. Users stay

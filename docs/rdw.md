@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Research Data Wrangling API (`.rdw`)
+title: Research Data Wrangling API (.rdw)
 ---
 
 The `.rdw` namespace contains general-purpose helpers that are useful in research datasets but are not specific to

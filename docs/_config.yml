@@ -3,6 +3,7 @@ description: Clinical NLP and research-data-wrangling expressions for Polars
 theme: minima
 markdown: kramdown
 header_pages:
+  - index.md
   - api.md
   - cnlp.md
   - rdw.md

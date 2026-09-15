@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Clinical NLP API (`.cnlp`)
+title: Clinical NLP API (.cnlp)
 ---
 
 The `.cnlp` namespace provides clinical concept matching and contextual interpretation as Polars expressions.
