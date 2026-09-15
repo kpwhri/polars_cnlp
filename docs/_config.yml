@@ -1,0 +1,12 @@
+title: polars-cnlp
+description: Clinical NLP and research-data-wrangling expressions for Polars
+theme: minima
+markdown: kramdown
+header_pages:
+  - api.md
+  - cnlp.md
+  - rdw.md
+  - algorithms.md
+  - custom-rules.md
+  - advanced.md
+  - how-it-works.md
