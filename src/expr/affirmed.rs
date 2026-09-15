@@ -13,6 +13,9 @@ struct AffirmedKwargs {
 
     #[serde(default)]
     algorithm: AlgorithmSpec,
+
+    #[serde(default)]
+    prefilter: bool,
 }
 
 #[polars_expr(output_type=Boolean)]
@@ -32,7 +35,15 @@ fn affirmed_concept(inputs: &[Series], kwargs: AffirmedKwargs) -> PolarsResult<S
 
     let result: BooleanChunked = text
         .iter()
-        .map(|text| text.and_then(|text| analyzer.affirmed(text, &concept)))
+        .map(|text| {
+            text.and_then(|text| {
+                if kwargs.prefilter && !concept.is_match(text) {
+                    return None;
+                }
+
+                analyzer.affirmed(text, &concept)
+            })
+        })
         .collect();
 
     Ok(result.into_series())

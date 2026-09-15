@@ -19,6 +19,9 @@ pub struct FindKwargs {
 
     #[serde(default)]
     pub algorithm: AlgorithmSpec,
+
+    #[serde(default)]
+    pub prefilter: bool,
 }
 
 #[derive(Debug, Clone, Copy)]

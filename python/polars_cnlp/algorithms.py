@@ -364,7 +364,7 @@ class RuleBased(Algorithm):
 AlgorithmLike = Literal['context', 'negex'] | Algorithm
 
 
-def algorithm_kwargs(kwargs: dict, algorithm: AlgorithmLike, ) -> dict:
+def algorithm_kwargs(kwargs: dict, algorithm: AlgorithmLike, prefilter: bool = False) -> dict:
     """Add a serialized context algorithm to plugin keyword arguments."""
     if algorithm == 'context':
         spec = ConText()._to_spec()
@@ -378,6 +378,7 @@ def algorithm_kwargs(kwargs: dict, algorithm: AlgorithmLike, ) -> dict:
     return {
         **kwargs,
         'algorithm': spec,
+        'prefilter': prefilter,
     }
 
 

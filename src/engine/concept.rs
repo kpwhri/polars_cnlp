@@ -28,6 +28,16 @@ impl Concept {
     }
 }
 
+pub fn contains_any(text: &str, concepts: &[Concept]) -> bool {
+    // Check if any concept is contained in text for use with `prefilter`
+    concepts.iter().any(|concept| concept.is_match(text))
+}
+
+#[inline]
+pub(crate) fn matches_any_concept(text: &str, concepts: &[Concept]) -> bool {
+    concepts.iter().any(|concept| concept.is_match(text))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40,25 +50,45 @@ mod tests {
 
         let findings: Vec<Span> = concept.find_iter(text).collect();
 
-        assert_eq!(findings, vec![Span::new(12, 21,),],);
+        assert_eq!(findings, vec![Span::new(12, 21)]);
     }
 
     #[test]
     fn matches_ignore_case() {
         let concept = Concept::new(r"\bpneumonia\b").unwrap();
 
-        assert!(concept.is_match("PNEUMONIA",));
+        assert!(concept.is_match("PNEUMONIA"));
     }
 
     #[test]
     fn counts_matches() {
         let concept = Concept::new(r"\bpneumonia\b").unwrap();
 
-        assert_eq!(concept.count("Pneumonia and pneumonia.",), 2,);
+        assert_eq!(concept.count("Pneumonia and pneumonia."), 2,);
     }
 
     #[test]
     fn invalid_regex_returns_error() {
-        assert!(Concept::new(r"[invalid",).is_err());
+        assert!(Concept::new(r"[invalid").is_err());
+    }
+
+    #[test]
+    fn concept_is_match() {
+        let concept = Concept::new(r"\bpneumonia\b").unwrap();
+
+        assert!(concept.is_match("Patient has pneumonia."));
+        assert!(concept.is_match("PNEUMONIA"));
+        assert!(!concept.is_match("Patient has asthma."));
+    }
+
+    #[test]
+    fn contains_any_concept() {
+        let concepts = vec![
+            Concept::new(r"\bpneumonia\b").unwrap(),
+            Concept::new(r"\banaphylaxis\b").unwrap(),
+        ];
+
+        assert!(contains_any("Patient has anaphylaxis.", &concepts));
+        assert!(!contains_any("Patient has asthma.", &concepts));
     }
 }

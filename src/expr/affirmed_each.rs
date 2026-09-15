@@ -1,10 +1,10 @@
-use polars::prelude::*;
-use pyo3_polars::derive::polars_expr;
-
 use super::algorithm::build_analyzer;
 use super::terms::{
     TermsKwargs, build_boolean_struct, compile_concepts, labels, struct_output_field,
 };
+use crate::engine::concept::matches_any_concept;
+use polars::prelude::*;
+use pyo3_polars::derive::polars_expr;
 
 fn affirmed_each_output(input_fields: &[Field], kwargs: TermsKwargs) -> PolarsResult<Field> {
     struct_output_field(input_fields, &kwargs.terms, DataType::Boolean)
@@ -27,6 +27,14 @@ fn affirmed_each_concepts(inputs: &[Series], kwargs: TermsKwargs) -> PolarsResul
     for text_value in text.iter() {
         match text_value {
             Some(text_value) => {
+                if kwargs.prefilter && !matches_any_concept(text_value, &concepts) {
+                    for column in &mut columns {
+                        column.push(None);
+                    }
+
+                    continue;
+                }
+
                 let values = analyzer.affirmed_each(text_value, &concepts);
 
                 for (column, value) in columns.iter_mut().zip(values) {

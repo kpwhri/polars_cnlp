@@ -11,6 +11,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Links to `pyproject.toml`
 * Ability to supply additional rules to default rule set
+* Optional parameter `prefilter` to exit early if no concepts are identified in a text
 
 ## [0.1.0] - 2026-09-11
 

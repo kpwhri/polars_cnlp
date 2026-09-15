@@ -100,6 +100,7 @@ class ClinicalNlpExpr:
             term: str,
             *,
             algorithm: AlgorithmLike = 'context',
+            prefilter: bool = False,
     ) -> pl.Expr:
         """ Check whether a concept is affirmed.
 
@@ -114,6 +115,10 @@ class ClinicalNlpExpr:
         algorithm
             Context algorithm. Use `'context'`, `'negex'`, or an
             `Algorithm` instance.
+        prefilter
+            Check for a matching concept before contextual processing.
+            This can improve performance when matching concepts are uncommon, but may
+            add overhead when most input text contains a matching concept.
 
         Returns
         -------
@@ -137,6 +142,7 @@ class ClinicalNlpExpr:
             kwargs=algorithm_kwargs(
                 {'pattern': term},
                 algorithm,
+                prefilter,
             ),
             is_elementwise=True,
         )
@@ -146,6 +152,7 @@ class ClinicalNlpExpr:
             terms: TermPatterns,
             *,
             algorithm: AlgorithmLike = 'context',
+            prefilter: bool = False,
     ) -> pl.Expr:
         """
         Check whether any requested concept is affirmed.
@@ -159,6 +166,10 @@ class ClinicalNlpExpr:
         algorithm
             Context algorithm. Use `'context'`, `'negex'`, or an
             `Algorithm` instance.
+        prefilter
+            Check for a matching concept before contextual processing.
+            This can improve performance when matching concepts are uncommon, but may
+            add overhead when most input text contains a matching concept.
 
         Returns
         -------
@@ -188,6 +199,7 @@ class ClinicalNlpExpr:
             kwargs=algorithm_kwargs(
                 predicate_terms_kwargs(terms),
                 algorithm,
+                prefilter,
             ),
             is_elementwise=True,
         )
@@ -197,6 +209,7 @@ class ClinicalNlpExpr:
             terms: TermPatterns,
             *,
             algorithm: AlgorithmLike = 'context',
+            prefilter: bool = False,
     ) -> pl.Expr:
         """
         Check whether all requested concepts are affirmed.
@@ -210,6 +223,10 @@ class ClinicalNlpExpr:
         algorithm
             Context algorithm. Use `'context'`, `'negex'`, or an
             `Algorithm` instance.
+        prefilter
+            Check for a matching concept before contextual processing.
+            This can improve performance when matching concepts are uncommon, but may
+            add overhead when most input text contains a matching concept.
 
         Returns
         -------
@@ -240,6 +257,7 @@ class ClinicalNlpExpr:
             kwargs=algorithm_kwargs(
                 predicate_terms_kwargs(terms),
                 algorithm,
+                prefilter,
             ),
             is_elementwise=True,
         )
@@ -249,6 +267,7 @@ class ClinicalNlpExpr:
             terms: Mapping[str, str],
             *,
             algorithm: AlgorithmLike = 'context',
+            prefilter: bool = False,
     ) -> pl.Expr:
         """
         Check affirmation status for each named concept.
@@ -260,6 +279,10 @@ class ClinicalNlpExpr:
         algorithm
             Context algorithm. Use `'context'`, `'negex'`, or an
             `Algorithm` instance.
+        prefilter
+            Check for a matching concept before contextual processing.
+            This can improve performance when matching concepts are uncommon, but may
+            add overhead when most input text contains a matching concept.
 
         Returns
         -------
@@ -289,6 +312,7 @@ class ClinicalNlpExpr:
             kwargs=algorithm_kwargs(
                 mapping_terms_kwargs(terms),
                 algorithm,
+                prefilter,
             ),
             is_elementwise=True,
         )
@@ -298,6 +322,7 @@ class ClinicalNlpExpr:
             terms: FindPatterns,
             *,
             algorithm: AlgorithmLike = 'context',
+            prefilter: bool = False,
     ) -> pl.Expr:
         """
         Return the highest-ranked contextualized finding.
@@ -316,6 +341,10 @@ class ClinicalNlpExpr:
         algorithm
             Context algorithm. Use `'context'`, `'negex'`, or an
             `Algorithm` instance.
+        prefilter
+            Check for a matching concept before contextual processing.
+            This can improve performance when matching concepts are uncommon, but may
+            add overhead when most input text contains a matching concept.
 
         Returns
         -------
@@ -344,6 +373,7 @@ class ClinicalNlpExpr:
             kwargs=algorithm_kwargs(
                 find_terms_kwargs(terms),
                 algorithm,
+                prefilter,
             ),
             is_elementwise=True,
         )
@@ -353,6 +383,7 @@ class ClinicalNlpExpr:
             terms: FindPatterns,
             *,
             algorithm: AlgorithmLike = 'context',
+            prefilter: bool = False,
     ) -> pl.Expr:
         """
         Return all contextualized findings.
@@ -368,6 +399,10 @@ class ClinicalNlpExpr:
         algorithm
             Context algorithm. Use `'context'`, `'negex'`, or an
             `Algorithm` instance.
+        prefilter
+            Check for a matching concept before contextual processing.
+            This can improve performance when matching concepts are uncommon, but may
+            add overhead when most input text contains a matching concept.
 
         Returns
         -------
@@ -398,6 +433,7 @@ class ClinicalNlpExpr:
             kwargs=algorithm_kwargs(
                 find_terms_kwargs(terms),
                 algorithm,
+                prefilter,
             ),
             is_elementwise=True,
         )

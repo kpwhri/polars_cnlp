@@ -2,12 +2,12 @@ use polars::chunked_array::builder::get_list_builder;
 use polars::prelude::*;
 use pyo3_polars::derive::polars_expr;
 
-use crate::engine::analyze::IndexedFinding;
-
 use super::algorithm::build_analyzer;
 use super::findings::{
     FindKwargs, build_finding_struct, compile_find_concepts, find_all_output, finding_dtype,
 };
+use crate::engine::analyze::IndexedFinding;
+use crate::engine::concept::matches_any_concept;
 
 #[derive(Debug, Clone, Copy)]
 struct FindingRange {
@@ -35,6 +35,11 @@ fn find_all_concepts(inputs: &[Series], kwargs: FindKwargs) -> PolarsResult<Seri
 
             Some(text_value) => {
                 let offset = flat_findings.len();
+
+                if kwargs.prefilter && !matches_any_concept(text_value, &concepts) {
+                    rows.push(Some(FindingRange { offset, length: 0 }));
+                    continue;
+                }
 
                 let findings = analyzer.find_all(text_value, &concepts);
 

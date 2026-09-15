@@ -22,6 +22,9 @@ pub struct TermsKwargs {
 
     #[serde(default)]
     pub algorithm: AlgorithmSpec,
+
+    #[serde(default)]
+    pub prefilter: bool,
 }
 
 pub fn validate_terms(terms: &[TermSpec]) -> PolarsResult<()> {
