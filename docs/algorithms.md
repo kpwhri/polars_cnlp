@@ -1,12 +1,6 @@
 ---
 layout: page
-title: Context algorithms
----
-
-# Context algorithms
-
-[Home](index.md) · [API](api.md) · [Clinical NLP](cnlp.md) · [RDW](rdw.md) · [Algorithms](algorithms.md) · [Custom rules](custom-rules.md) · [Advanced usage](advanced.md) · [How it works](how-it-works.md)
-
+title: Context Algorithms
 ---
 
 The contextual `.cnlp` methods support interchangeable algorithms. ConText is the default; NegEx is available when

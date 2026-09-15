@@ -1,13 +1,8 @@
 ---
 layout: page
-title: Advanced usage
+title: Advanced Usage
 ---
 
-# Advanced usage
-
-[Home](index.md) · [API](api.md) · [Clinical NLP](cnlp.md) · [RDW](rdw.md) · [Algorithms](algorithms.md) · [Custom rules](custom-rules.md) · [Advanced usage](advanced.md) · [How it works](how-it-works.md)
-
----
 
 This page collects patterns that are useful in larger research pipelines and NLP validation work.
 

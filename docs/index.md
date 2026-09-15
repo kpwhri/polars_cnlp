@@ -3,11 +3,6 @@ layout: page
 title: polars-cnlp
 ---
 
-# polars-cnlp
-
-[Home](index.md) · [API](api.md) · [Clinical NLP](cnlp.md) · [RDW](rdw.md) · [Algorithms](algorithms.md) · [Custom rules](custom-rules.md) · [Advanced usage](advanced.md) · [How it works](how-it-works.md)
-
----
 
 `polars-cnlp` adds clinical NLP and research-data-wrangling expressions directly to [Polars](https://pola.rs/).
 

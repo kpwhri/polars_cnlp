@@ -3,11 +3,6 @@ layout: page
 title: Public API
 ---
 
-# Public API
-
-[Home](index.md) · [API](api.md) · [Clinical NLP](cnlp.md) · [RDW](rdw.md) · [Algorithms](algorithms.md) · [Custom rules](custom-rules.md) · [Advanced usage](advanced.md) · [How it works](how-it-works.md)
-
----
 
 The public API is organized around two Polars expression namespaces plus configurable clinical-context algorithms.
 

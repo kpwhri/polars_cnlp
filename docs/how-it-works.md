@@ -1,12 +1,6 @@
 ---
 layout: page
-title: How polars-cnlp works
----
-
-# How polars-cnlp works
-
-[Home](index.md) · [API](api.md) · [Clinical NLP](cnlp.md) · [RDW](rdw.md) · [Algorithms](algorithms.md) · [Custom rules](custom-rules.md) · [Advanced usage](advanced.md) · [How it works](how-it-works.md)
-
+title: How `polars-cnlp` Works
 ---
 
 `polars-cnlp` is designed as a Polars expression extension rather than a separate note-processing framework. Users stay

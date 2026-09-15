@@ -1,12 +1,6 @@
 ---
 layout: page
-title: Custom rules and algorithms
----
-
-# Custom rules and algorithms
-
-[Home](index.md) · [API](api.md) · [Clinical NLP](cnlp.md) · [RDW](rdw.md) · [Algorithms](algorithms.md) · [Custom rules](custom-rules.md) · [Advanced usage](advanced.md) · [How it works](how-it-works.md)
-
+title: Custom Rules and Algorithms
 ---
 
 Rule customization is useful when a project needs vocabulary that is not present in the built-in ConText or NegEx rules.

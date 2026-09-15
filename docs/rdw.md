@@ -1,12 +1,6 @@
 ---
 layout: page
-title: Research data-wrangling API
----
-
-# Research Data Wrangling API: `.rdw`
-
-[Home](index.md) · [API](api.md) · [Clinical NLP](cnlp.md) · [RDW](rdw.md) · [Algorithms](algorithms.md) · [Custom rules](custom-rules.md) · [Advanced usage](advanced.md) · [How it works](how-it-works.md)
-
+title: Research Data Wrangling API (`.rdw`)
 ---
 
 The `.rdw` namespace contains general-purpose helpers that are useful in research datasets but are not specific to
