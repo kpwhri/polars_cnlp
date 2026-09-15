@@ -102,6 +102,10 @@ argument.
 
 ## `cnlp.contains`
 
+```python
+contains(pattern: str) -> pl.Expr
+```
+
 Check whether text contains a regular expression.
 
 ```python
@@ -133,6 +137,10 @@ hypothetical, or attributed to another experiencer.
 
 ## `cnlp.count`
 
+```python
+count(term: str) -> pl.Expr
+```
+
 Count occurrences of one concept.
 
 ```python
@@ -161,6 +169,10 @@ Use `count()` for mention frequency, simple NLP features, or identifying notes w
 Because `count()` does not perform contextual analysis, it is cheaper than `find_all()` or `affirmed()`.
 
 ## `cnlp.count_all`
+
+```python
+count_all(terms: Mapping[str, str]) -> pl.Expr
+```
 
 Count several named concepts in one expression.
 
@@ -267,6 +279,15 @@ experiencer = patient
 
 ## `cnlp.affirmed`
 
+```python
+affirmed(
+    term: str,
+    *,
+    algorithm: AlgorithmLike = 'context',
+    prefilter: bool = False,
+) -> pl.Expr
+```
+
 Determine whether a concept is affirmed.
 
 ```python
@@ -320,6 +341,15 @@ affirmed_notes = df.filter(
 ```
 
 ## `cnlp.affirmed_any`
+
+```python
+affirmed_any(
+    terms: TermPatterns,
+    *,
+    algorithm: AlgorithmLike = 'context',
+    prefilter: bool = False,
+) -> pl.Expr
+```
 
 Return whether any requested concept is affirmed.
 
@@ -392,6 +422,15 @@ cohort = df.filter(
 
 ## `cnlp.affirmed_all`
 
+```python
+affirmed_all(
+    terms: TermPatterns,
+    *,
+    algorithm: AlgorithmLike = 'context',
+    prefilter: bool = False,
+) -> pl.Expr
+```
+
 Return whether every requested concept is affirmed.
 
 ```python
@@ -435,6 +474,15 @@ cohort = df.filter(
 ```
 
 ## `cnlp.affirmed_each`
+
+```python
+affirmed_each(
+    terms: Mapping[str, str],
+    *,
+    algorithm: AlgorithmLike = 'context',
+    prefilter: bool = False,
+) -> pl.Expr
+```
 
 Return independent affirmation status for every named concept.
 
@@ -520,6 +568,15 @@ Example:
 
 ## `cnlp.find_best`
 
+```python
+find_best(
+    terms: FindPatterns,
+    *,
+    algorithm: AlgorithmLike = 'context',
+    prefilter: bool = False,
+) -> pl.Expr
+```
+
 Return the highest-ranked contextualized finding.
 
 Single concept:
@@ -572,6 +629,15 @@ Use cases:
 - return the preferred span for review or annotation.
 
 ## `cnlp.find_all`
+
+```python
+find_all(
+    terms: FindPatterns,
+    *,
+    algorithm: AlgorithmLike = 'context',
+    prefilter: bool = False,
+) -> pl.Expr
+```
 
 Return every contextualized finding in text order.
 
@@ -637,6 +703,36 @@ find_all
 ```
 
 `contains`, `count`, and `count_all` do not perform contextual analysis.
+
+## Prefiltering
+
+All contextual methods accept `prefilter=True`:
+
+```python
+result = df.select(
+    pl.col('note_text').cnlp.affirmed(
+        PNEUMONIA,
+        prefilter=True,
+    ),
+)
+```
+
+For multiple concepts:
+
+```python
+result = df.select(
+    pl.col('note_text').cnlp.affirmed_each(
+        terms,
+        prefilter=True,
+    ).alias('status'),
+)
+```
+
+When enabled, `polars-cnlp` first checks whether any requested concept regex matches the note. If none match, it skips
+ConText, NegEx, or other contextual processing and returns the normal no-match result. This can improve performance when
+the requested concepts are uncommon. When most notes contain a matching concept, the prefilter may add some overhead.
+
+`prefilter` changes execution only; it does not change result semantics.
 
 ## ConText
 
@@ -918,6 +1014,10 @@ Both methods treat the supplied values as literal strings rather than regular ex
 
 ## `rdw.starts_with_any`
 
+```python
+starts_with_any(prefixes: Sequence[str]) -> pl.Expr
+```
+
 Check if a column starts with any of a collection/list of strings.
 
 ### Parameters
@@ -1004,6 +1104,10 @@ null input               -> null
 ```
 
 ## `rdw.ends_with_any`
+
+```python
+ends_with_any(suffixes: Sequence[str]) -> pl.Expr
+```
 
 Check if a column ends with any of a collection/list of strings.
 
