@@ -13,6 +13,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * Ability to supply additional rules to default rule set
 * Optional parameter `prefilter` to exit early if no concepts are identified in a text
 
+### Changed
+
+* Handle special case where search term (i.e., concept) is *also* a negation term (e.g., excluding lists of drugs as
+  hypothetical)
+
 ## [0.1.0] - 2026-09-11
 
 ### Added
@@ -20,7 +25,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Base implementation for negex/context for concept detection in text
 - Useful data wrangling extension expressions to `polars` for `starts_with_any` and `ends_with_any`
 - Github setup + pypi releases
-
 
 [unreleased]: https://github.com/kpwhri/polars_cnlp/compare/v0.1.0...HEAD
 

@@ -899,6 +899,44 @@ NegEx(rules=RuleSet([...]))      -> replacement rule set
 
 `rules=` and `additional_rules=` cannot be used together.
 
+### Concepts that also match modifier rules
+
+A concept may also match a ConText or NegEx modifier rule. This can be useful when a term acts as a modifier for other
+concepts:
+
+```text
+Kratom and morphine.
+^^^^^^     ^^^^^^^^
+modifier   target
+```
+
+A modifier is not applied to a target whose text span overlaps the modifier itself. The overlapping modifier is also
+ignored as a modifier boundary when resolving that target.
+
+For example, if `kratom` is both a searched concept and a forward negation rule:
+
+```text
+Kratom.
+```
+
+`kratom` does not negate itself.
+
+```text
+Kratom and morphine.
+```
+
+`kratom` can still negate `morphine`.
+
+```text
+No kratom.
+```
+
+the overlapping `kratom` rule does not prevent the separate `no` rule from negating `kratom`.
+
+This behavior is based on overlapping text spans, not on whether the concept and modifier use identical regular
+expressions. If a concept pattern intentionally includes text matched by a modifier, that modifier will not
+contextualize that concept occurrence.
+
 ## Replace the ConText rule set
 
 Sometimes, we want a completely new set of rules. To do this, we'll create a new RuleSet and pass it to the algorithm

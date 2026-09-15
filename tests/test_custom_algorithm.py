@@ -1,3 +1,5 @@
+import pytest
+
 import polars as pl
 
 import polars_cnlp
@@ -377,3 +379,43 @@ def test_custom_algorithm_integrates_with_multi_term_calls(terms):
         'pneumonia': False,
         'anaphylaxis': True,
     }]
+
+
+@pytest.mark.parametrize('algorithm_func', [
+    NegEx, ConText,
+])
+def test_concept_does_not_negate_itself(algorithm_func):
+    terms = {
+        'kratom': r'\bkratom\b',
+        'morphine': r'\bmorphine\b',
+        'fentanyl': r'\bfentanyl\b',
+    }
+
+    algorithm = algorithm_func(
+        additional_rules=[
+            ContextRule(
+                pattern=r'\bkratom\b',
+                direction='forward',
+                effect=ContextEffect(assertion='negated'),
+            ),
+        ],
+    )
+
+    df = pl.DataFrame({'note_text': [
+        'Kratom.',
+        'Kratom and morphine.',
+        'No kratom.',
+    ]})
+
+    result = df.select(
+        pl.col('note_text').cnlp.affirmed_each(
+            terms,
+            algorithm=algorithm,
+        ).alias('status'),
+    )
+
+    assert result['status'].to_list() == [
+        {'kratom': True, 'morphine': None, 'fentanyl': None},
+        {'kratom': True, 'morphine': False, 'fentanyl': None},
+        {'kratom': False, 'morphine': None, 'fentanyl': None},
+    ]

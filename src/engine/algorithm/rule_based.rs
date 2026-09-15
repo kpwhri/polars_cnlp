@@ -71,6 +71,11 @@ pub struct RuleBasedAlgorithm {
 struct PreparedNote {
     tokens: Vec<Span>,
     modifiers: Vec<ContextModifier>,
+
+    // Scope after explicit terminator/pseudo boundaries, but before modifiers
+    // limit one another. This is only needed when a target overlaps a modifier
+    // and modifier boundaries must therefore be resolved per target.
+    base_modifiers: Vec<ContextModifier>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -132,6 +137,7 @@ impl RuleBasedAlgorithm {
             return PreparedNote {
                 tokens,
                 modifiers: Vec::new(),
+                base_modifiers: Vec::new(),
             };
         }
 
@@ -209,10 +215,15 @@ impl RuleBasedAlgorithm {
             }
         }
 
-        let modifier_snapshot = modifiers.clone();
+        // Keep the scopes before modifier-to-modifier boundaries are applied.
+        // Normally the precomputed scopes below are used. If a target itself
+        // overlaps a modifier, these base scopes let us rebuild boundaries
+        // without allowing that modifier to block another modifier from the
+        // same target.
+        let base_modifiers = modifiers.clone();
 
         for (modifier_index, modifier) in modifiers.iter_mut().enumerate() {
-            for (other_index, other) in modifier_snapshot.iter().enumerate() {
+            for (other_index, other) in base_modifiers.iter().enumerate() {
                 if modifier_index == other_index {
                     continue;
                 }
@@ -229,7 +240,11 @@ impl RuleBasedAlgorithm {
             }
         }
 
-        PreparedNote { tokens, modifiers }
+        PreparedNote {
+            tokens,
+            modifiers,
+            base_modifiers,
+        }
     }
 
     fn apply_scope_policy(&self, rule_match: &mut RuleMatch) {
@@ -268,7 +283,13 @@ impl ContextAlgorithm for RuleBasedAlgorithm {
             return vec![FindingContext::default(); targets.len()];
         }
 
-        resolve_targets(targets, &prepared.tokens, &prepared.modifiers)
+        resolve_targets(
+            targets,
+            &prepared.tokens,
+            &prepared.modifiers,
+            &prepared.base_modifiers,
+            self.config.modifier_boundary_policy,
+        )
     }
 }
 
@@ -276,26 +297,66 @@ fn resolve_targets(
     targets: &[ContextTarget],
     tokens: &[Span],
     modifiers: &[ContextModifier],
+    base_modifiers: &[ContextModifier],
+    boundary_policy: ModifierBoundaryPolicy,
 ) -> Vec<FindingContext> {
     let target_ranges = targets
         .iter()
         .map(|target| token_range(target.span, tokens))
         .collect::<Vec<_>>();
 
+    // Most targets do not overlap a modifier and can use the scopes computed
+    // once in `prepare()`. Only overlapping targets need target-specific scope.
+    let target_overlaps_modifier = targets
+        .iter()
+        .map(|target| {
+            base_modifiers
+                .iter()
+                .any(|modifier| modifier.span().overlaps(target.span))
+        })
+        .collect::<Vec<_>>();
+
     let mut applications = vec![Vec::new(); targets.len()];
 
-    for modifier in modifiers {
+    for (modifier_index, modifier) in modifiers.iter().enumerate() {
         let mut candidates = target_ranges
             .iter()
             .enumerate()
             .filter_map(|(target_index, target_range)| {
                 let target_range = (*target_range)?;
+                let target = &targets[target_index];
 
-                if !modifier.modifies(target_range) {
+                // A modifier must never contextualize text that it also matches
+                // as the target. For example, a `kratom` negation rule should
+                // not make the concept `kratom` negate itself.
+                if modifier.span().overlaps(target.span) {
                     return None;
                 }
 
-                modifier
+                // Modifier boundaries are normally precomputed. When the target
+                // overlaps some other modifier, rebuild this modifier's scope
+                // while ignoring modifiers occupying the target span. Otherwise
+                // "No kratom" could have `kratom` terminate the scope of `No`
+                // before `No` reaches the kratom target.
+                let scoped_modifier;
+
+                let effective_modifier = if target_overlaps_modifier[target_index] {
+                    scoped_modifier = scope_modifier_for_target(
+                        modifier_index,
+                        target,
+                        base_modifiers,
+                        boundary_policy,
+                    );
+                    &scoped_modifier
+                } else {
+                    modifier
+                };
+
+                if !effective_modifier.modifies(target_range) {
+                    return None;
+                }
+
+                effective_modifier
                     .distance_to(target_range)
                     .map(|distance| (target_index, distance))
             })
@@ -326,6 +387,40 @@ fn resolve_targets(
         .iter()
         .map(|applications| resolve_context(applications))
         .collect()
+}
+
+fn scope_modifier_for_target(
+    modifier_index: usize,
+    target: &ContextTarget,
+    modifiers: &[ContextModifier],
+    boundary_policy: ModifierBoundaryPolicy,
+) -> ContextModifier {
+    let mut modifier = modifiers[modifier_index].clone();
+
+    for (other_index, other) in modifiers.iter().enumerate() {
+        if modifier_index == other_index {
+            continue;
+        }
+
+        // A modifier that occupies this target is still a valid modifier for
+        // other targets, but it must not terminate another modifier's scope
+        // while resolving this particular target.
+        if other.span().overlaps(target.span) {
+            continue;
+        }
+
+        match boundary_policy {
+            ModifierBoundaryPolicy::SameEffectOrConfigured => {
+                modifier.limit_scope_to_modifier(other);
+            }
+
+            ModifierBoundaryPolicy::AnyModifier => {
+                modifier.limit_scope_to_terminator(other.token_span());
+            }
+        }
+    }
+
+    modifier
 }
 
 fn resolve_context(applications: &[ModifierApplication]) -> FindingContext {
@@ -542,5 +637,108 @@ mod tests {
     #[test]
     fn fixed_window_zero_is_rejected() {
         assert!(RuleBasedAlgorithm::compile_negex(&[negation_rule()], 0,).is_err());
+    }
+    fn negated() -> ContextEffect {
+        ContextEffect::new().with_assertion(Assertion::Negated)
+    }
+
+    fn forward_rule(pattern: &str) -> ContextRule {
+        ContextRule::context(
+            pattern,
+            Direction::Forward,
+            negated(),
+            ContextOptions::default(),
+        )
+    }
+
+    fn make_target(text: &str, value: &str, concept_index: usize) -> ContextTarget {
+        let start = text.find(value).unwrap();
+
+        ContextTarget {
+            span: Span::new(start, start + value.len()),
+            concept_indices: vec![concept_index],
+        }
+    }
+
+    #[test]
+    fn modifier_does_not_modify_overlapping_make_target() {
+        let algorithm =
+            RuleBasedAlgorithm::compile_negex(&[forward_rule(r"\bkratom\b")], 6).unwrap();
+
+        let text = "kratom";
+        let targets = [make_target(text, "kratom", 0)];
+
+        let result = algorithm.resolve(text, &targets);
+
+        assert_eq!(result[0].assertion, Assertion::Affirmed);
+    }
+
+    #[test]
+    fn overlapping_modifier_does_not_block_other_modifier() {
+        let algorithm = RuleBasedAlgorithm::compile_negex(
+            &[forward_rule(r"\bno\b"), forward_rule(r"\bkratom\b")],
+            6,
+        )
+        .unwrap();
+
+        let text = "no kratom";
+        let targets = [make_target(text, "kratom", 0)];
+
+        let result = algorithm.resolve(text, &targets);
+
+        assert_eq!(result[0].assertion, Assertion::Negated);
+    }
+
+    #[test]
+    fn overlapping_modifier_still_modifies_other_make_target() {
+        let algorithm =
+            RuleBasedAlgorithm::compile_negex(&[forward_rule(r"\bkratom\b")], 6).unwrap();
+
+        let text = "kratom morphine";
+        let targets = [
+            make_target(text, "kratom", 0),
+            make_target(text, "morphine", 1),
+        ];
+
+        let result = algorithm.resolve(text, &targets);
+
+        assert_eq!(result[0].assertion, Assertion::Affirmed);
+        assert_eq!(result[1].assertion, Assertion::Negated);
+    }
+
+    #[test]
+    fn overlapping_modifier_is_ignored_only_for_overlapping_make_target() {
+        let algorithm = RuleBasedAlgorithm::compile_negex(
+            &[forward_rule(r"\bno\b"), forward_rule(r"\bkratom\b")],
+            6,
+        )
+        .unwrap();
+
+        let text = "no kratom morphine";
+        let targets = [
+            make_target(text, "kratom", 0),
+            make_target(text, "morphine", 1),
+        ];
+
+        let result = algorithm.resolve(text, &targets);
+
+        assert_eq!(result[0].assertion, Assertion::Negated);
+        assert_eq!(result[1].assertion, Assertion::Negated);
+    }
+
+    #[test]
+    fn context_handles_overlapping_modifier_per_make_target() {
+        let algorithm = RuleBasedAlgorithm::compile_context(&[
+            forward_rule(r"\bno\b"),
+            forward_rule(r"\bkratom\b"),
+        ])
+        .unwrap();
+
+        let text = "no kratom";
+        let targets = [make_target(text, "kratom", 0)];
+
+        let result = algorithm.resolve(text, &targets);
+
+        assert_eq!(result[0].assertion, Assertion::Negated);
     }
 }
