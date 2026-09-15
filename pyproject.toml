@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "polars-cnlp"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.11"
 dependencies = [
     "polars",
@@ -23,6 +23,7 @@ classifiers = [
 
 [project.urls]
 Home = "https://github.com/kpwhri/polars_cnlp"
+Documentation = "https://kpwhri.github.io/polars_cnlp"
 Changelog = "https://github.com/kpwhri/polars_cnlp/blob/master/CHANGELOG.md"
 Issues = "https://github.com/kpwhri/polars_cnlp/issues"
 
