@@ -72,4 +72,16 @@ def test_starts_with_any_preserves_null():
         pl.col('value').rdw.starts_with_any(['ab'])
     )
 
-    assert result.to_series().to_list() == [True, None, False, ]
+    assert result.to_series().to_list() == [True, None, False]
+
+
+def test_starts_with_any_empty_preserves_null():
+    df = pl.DataFrame({
+        'code': ['AB12', 'CD12', None],
+    })
+
+    result = df.select(
+        pl.col('code').rdw.starts_with_any([]).alias('result'),
+    )
+
+    assert result['result'].to_list() == [False, False, None]

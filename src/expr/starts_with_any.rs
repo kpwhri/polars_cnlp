@@ -13,7 +13,7 @@ pub fn starts_with_any(inputs: &[Series], kwargs: StartsWithAnyKwargs) -> Polars
     let ca = inputs[0].str()?;
 
     if kwargs.prefixes.is_empty() {
-        let out = BooleanChunked::full(ca.name().clone(), false, ca.len());
+        let out: BooleanChunked = ca.iter().map(|value| value.map(|_| false)).collect();
 
         return Ok(out.into_series());
     }

@@ -90,3 +90,15 @@ def test_ends_with_any_overlapping_suffixes(value, expected):
     )
 
     assert result == expected
+
+
+def test_ends_with_any_empty_preserves_null():
+    df = pl.DataFrame({
+        'code': ['AB12', 'CD12', None],
+    })
+
+    result = df.select(
+        pl.col('code').rdw.ends_with_any([]).alias('result'),
+    )
+
+    assert result['result'].to_list() == [False, False, None]

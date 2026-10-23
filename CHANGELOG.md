@@ -7,6 +7,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+* `starts_with_any` would not retain `null`/None when empty `starts_with_any`
+
 ## [0.2.0] - 2026-09-15
 
 ### Added
