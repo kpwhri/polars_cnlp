@@ -16,6 +16,17 @@ appear unused to editors or linters.
 > import polars_cnlp  # noqa: F401  # registers .cnlp and .rdw namespaces
 > ```
 
+Alternatively, to get better autocomplete support, use these expressions by importing `cnlp` and using this pattern:
+* `cnlp.function(pl.col(colname), *args, **kwargs)`
+
+For example:
+```python
+import polars as pl
+from polars_cnlp import cnlp
+
+# `cnlp.function(pl.col(colname), *args, **kwargs)`
+cnlp.affirmed(pl.col('note_text'), 'pneumonia')
+```
 
 | Method                                  | Input               | Output              | Typical use                        |
 |-----------------------------------------|---------------------|---------------------|------------------------------------|

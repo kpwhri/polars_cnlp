@@ -18,6 +18,19 @@ appear unused to editors or linters.
 > import polars as pl
 > import polars_cnlp  # noqa: F401  # registers .cnlp and .rdw namespaces
 > ```
+ 
+Alternatively, to get better autocomplete support, use these expressions by importing `rdw` and using this pattern:
+* `rdw.function(pl.col(colname), *args, **kwargs)`
+
+For example:
+```python
+import polars as pl
+from polars_cnlp import rdw
+
+# `rdw.function(pl.col(colname), *args, **kwargs)`
+rdw.starts_with_any(pl.col('dx'), ['A', 'B', 'C1'])
+``` 
+
 
 | Method                                     | Input                        | Output    | Typical use                           |
 |--------------------------------------------|------------------------------|-----------|---------------------------------------|
