@@ -7,13 +7,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
 ### Fixed
 
 * `starts_with_any` would not retain `null`/None when empty `starts_with_any`
 
 ### Changed
 
-* Added interface for better autocompletee/param help as recommended by https://github.com/pola-rs/polars/issues/13899 + tests
+* Added interface for better autocompletee/param help as recommended by https://github.com/pola-rs/polars/issues/13899 +
+  tests
 
 ## [0.2.0] - 2026-09-15
 
@@ -37,7 +40,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Useful data wrangling extension expressions to `polars` for `starts_with_any` and `ends_with_any`
 - Github setup + pypi releases
 
-[unreleased]: https://github.com/kpwhri/polars_cnlp/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/kpwhri/polars_cnlp/compare/v0.3.0...HEAD
+
+[0.3.0]: https://github.com/kpwhri/polars_cnlp/compare/v0.2.0...v0.3.0
 
 [0.2.0]: https://github.com/kpwhri/polars_cnlp/compare/v0.1.0...v0.2.0
 
