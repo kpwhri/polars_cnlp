@@ -1,5 +1,15 @@
 import polars as pl
 import pytest
+import polars_cnlp
+from polars_cnlp import rdw
+
+
+def namespace_ends_with_any(expr: pl.Expr, patterns: list[str]) -> pl.Expr:
+    return expr.rdw.ends_with_any(patterns)
+
+
+def function_ends_with_any(expr: pl.Expr, patterns: list[str]) -> pl.Expr:
+    return rdw.ends_with_any(expr, patterns)
 
 
 @pytest.mark.parametrize('value, patterns, expected', [
@@ -18,14 +28,18 @@ import pytest
     ('', [''], True),
     (None, ['ing', 'ed'], None),
 ])
-def test_ends_with_any(value, patterns, expected):
+@pytest.mark.parametrize('func', [
+    namespace_ends_with_any,
+    function_ends_with_any,
+])
+def test_ends_with_any(value, patterns, expected, func):
     result = (
         pl.DataFrame(
             {'value': [value]},
             schema={'value': pl.String},
         )
         .select(
-            pl.col('value').rdw.ends_with_any(patterns)
+            pl.col('value').rdw.ends_with_any(patterns),
         )
         .item()
     )

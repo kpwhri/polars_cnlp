@@ -2,11 +2,24 @@ import polars as pl
 import pytest
 
 import polars_cnlp
+from polars_cnlp import cnlp
 
 PNEUMONIA = r'\bpneumonia\b'
 
 
-def test_find_best_with_single_regex():
+def namespace_find_best(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return expr.cnlp.find_best(terms)
+
+
+def function_find_best(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return cnlp.find_best(expr, terms)
+
+
+@pytest.mark.parametrize('func', [
+    namespace_find_best,
+    function_find_best,
+])
+def test_find_best_with_single_regex(func):
     result = pl.DataFrame({'note_text': [
         'No pneumonia.',
         'Asthma present.',
@@ -14,9 +27,7 @@ def test_find_best_with_single_regex():
     ]},
         schema={'note_text': pl.String},
     ).select(
-        pl.col('note_text')
-        .cnlp.find_best(r'\bpneumonia\b')
-        .alias('finding'),
+        func(pl.col('note_text'), r'\bpneumonia\b').alias('finding'),
     )
 
     assert result['finding'].to_list() == [

@@ -1,9 +1,23 @@
 import polars as pl
+import pytest
 
 import polars_cnlp
+from polars_cnlp import cnlp
 
 
-def test_count_all(terms):
+def namespace_count_all(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return expr.cnlp.count_all(terms)
+
+
+def function_count_all(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return cnlp.count_all(expr, terms)
+
+
+@pytest.mark.parametrize('func', [
+    namespace_count_all,
+    function_count_all,
+])
+def test_count_all(terms, func):
     df = pl.DataFrame({'note_text': [
         'Pneumonia. Pneumonia.',
         'No pneumonia.',
@@ -15,7 +29,7 @@ def test_count_all(terms):
     )
 
     result = df.select(
-        pl.col('note_text').cnlp.count_all(terms).alias('counts'),
+        func(pl.col('note_text'), terms).alias('counts'),
     )
 
     assert result['counts'].to_list() == [

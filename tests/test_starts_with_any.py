@@ -1,5 +1,15 @@
 import polars as pl
 import pytest
+import polars_cnlp
+from polars_cnlp import rdw
+
+
+def namespace_starts_with_any(expr: pl.Expr, patterns: list[str]) -> pl.Expr:
+    return expr.rdw.starts_with_any(patterns)
+
+
+def function_starts_with_any(expr: pl.Expr, patterns: list[str]) -> pl.Expr:
+    return rdw.starts_with_any(expr, patterns)
 
 
 @pytest.mark.parametrize('value, patterns, expected', [
@@ -19,16 +29,18 @@ import pytest
     ('', [''], True),
     (None, ['ab', 'cd'], None),
 ])
-def test_starts_with_any(value, patterns, expected):
+@pytest.mark.parametrize('func', [
+    namespace_starts_with_any,
+    function_starts_with_any,
+])
+def test_starts_with_any(value, patterns, expected, func):
     result = (
         pl.DataFrame(
             {'value': [value]},
             schema={'value': pl.String},
         )
         .select(
-            pl.col('value')
-            .rdw.starts_with_any(patterns)
-            .alias('result')
+            func(pl.col('value'), patterns).alias('result')
         )
         .item()
     )

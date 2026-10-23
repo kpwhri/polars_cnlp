@@ -1,10 +1,8 @@
-from pathlib import Path
 from typing import Collection
 
 import polars as pl
-from polars.plugins import register_plugin_function
 
-_PLUGIN_PATH = Path(__file__).parent
+from polars_cnlp import rdw
 
 
 @pl.api.register_expr_namespace('rdw')
@@ -30,23 +28,10 @@ class ResearchDataWranglingExpr:
         Examples
         --------
         >>> df.filter(
-        ...     pl.col('dx').cnlp.starts_with_any([123, 456]),
+        ...     pl.col('dx').rdw.starts_with_any([123, 456]),
         ... )
         """
-        prefixes = list(prefixes)
-
-        if not all(isinstance(prefix, str) for prefix in prefixes):
-            raise TypeError('prefixes must contain only strings')
-
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='starts_with_any',
-            args=[self._expr],
-            kwargs={
-                'prefixes': prefixes,
-            },
-            is_elementwise=True,
-        )
+        return rdw.starts_with_any(self._expr, prefixes)
 
     def ends_with_any(self, prefixes: Collection[str]) -> pl.Expr:
         """Check whether each string ends with any literal pattern.
@@ -69,10 +54,7 @@ class ResearchDataWranglingExpr:
         ...     'value': ['running', 'walked', 'quickly', 'run'],
         ... })
         >>> df.filter(
-        ...     ends_with_any(
-        ...         pl.col('value'),
-        ...         ['ing', 'ed'],
-        ...     )
+        ...     pl.col('value').rdw.ends_with_any(['ing', 'ed']),
         ... )
         shape: (2, 1)
         ┌─────────┐
@@ -89,15 +71,4 @@ class ResearchDataWranglingExpr:
         Patterns are interpreted literally, not as regular expressions.
         An empty pattern matches every non-null string.
         """
-        prefixes = list(prefixes)
-
-        if not all(isinstance(pattern, str) for pattern in prefixes):
-            raise TypeError('patterns must contain only strings')
-
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='ends_with_any',
-            args=self._expr,
-            kwargs={'prefixes': prefixes},
-            is_elementwise=True,
-        )
+        return rdw.ends_with_any(self._expr, prefixes)

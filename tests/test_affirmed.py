@@ -1,10 +1,25 @@
 import polars as pl
+import pytest
+
 import polars_cnlp
+from polars_cnlp import cnlp
 
 PNEUMONIA = r'\bpneumonia\b'
 
 
-def test_affirmed_truth_table():
+def namespace_affirmed(expr: pl.Expr, term: str) -> pl.Expr:
+    return expr.cnlp.affirmed(term)
+
+
+def function_affirmed(expr: pl.Expr, term: str) -> pl.Expr:
+    return cnlp.affirmed(expr, term)
+
+
+@pytest.mark.parametrize('func', [
+    namespace_affirmed,
+    function_affirmed,
+])
+def test_affirmed_truth_table(func):
     df = pl.DataFrame({'note_text': [
         'Patient has pneumonia.',
         'No pneumonia.',
@@ -20,7 +35,7 @@ def test_affirmed_truth_table():
     )
 
     result = df.select(
-        pl.col('note_text').cnlp.affirmed(PNEUMONIA).alias('pneumonia'),
+        func(pl.col('note_text'), PNEUMONIA).alias('pneumonia'),
     )
 
     assert result['pneumonia'].to_list() == [True, False, False, False, False, None, None]

@@ -1,9 +1,23 @@
 import polars as pl
+import pytest
 
 import polars_cnlp
+from polars_cnlp import cnlp
 
 
-def test_find_all_with_single_regex():
+def namespace_find_all(expr: pl.Expr, terms) -> pl.Expr:
+    return expr.cnlp.find_all(terms)
+
+
+def function_find_all(expr: pl.Expr, terms) -> pl.Expr:
+    return cnlp.find_all(expr, terms)
+
+
+@pytest.mark.parametrize('func', [
+    namespace_find_all,
+    function_find_all,
+])
+def test_find_all_with_single_regex(func):
     df = pl.DataFrame(
         {'note_text': [
             'No pneumonia.',
@@ -14,9 +28,7 @@ def test_find_all_with_single_regex():
     )
 
     result = df.select(
-        pl.col('note_text')
-        .cnlp.find_all(r'\bpneumonia\b')
-        .alias('findings'),
+        func(pl.col('note_text'), r'\bpneumonia\b').alias('findings'),
     )
 
     assert result['findings'].to_list() == [

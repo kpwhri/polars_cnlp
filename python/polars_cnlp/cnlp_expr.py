@@ -1,14 +1,11 @@
-from collections.abc import Mapping, Sequence
-from pathlib import Path
+from collections.abc import Mapping
 
 import polars as pl
-from polars.plugins import register_plugin_function
 
-from polars_cnlp.algorithms import AlgorithmLike, algorithm_kwargs
-from polars_cnlp.mapping import TermPatterns, FindPatterns, mapping_terms_kwargs, predicate_terms_kwargs, \
-    find_terms_kwargs
+from polars_cnlp.algorithms import AlgorithmLike
+from polars_cnlp.mapping import TermPatterns, FindPatterns
 
-_PLUGIN_PATH = Path(__file__).parent
+from polars_cnlp import cnlp
 
 
 @pl.api.register_expr_namespace('cnlp')
@@ -20,13 +17,7 @@ class ClinicalNlpExpr:
 
     def contains(self, pattern: str) -> pl.Expr:
         """Check whether the text contains a regular expression."""
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='contains_target',
-            args=[self._expr],
-            kwargs={'pattern': pattern},
-            is_elementwise=True,
-        )
+        return cnlp.contains(self._expr, pattern)
 
     def count(self, term: str) -> pl.Expr:
         """Count occurrences of a concept.
@@ -51,13 +42,7 @@ class ClinicalNlpExpr:
         ...     pl.col('note_text').cnlp.count(r'\\bpneumonia\\b'),
         ... )
         """
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='count_concept',
-            args=[self._expr],
-            kwargs={'pattern': term},
-            is_elementwise=True,
-        )
+        return cnlp.count(self._expr, term)
 
     def count_all(self, terms: Mapping[str, str]) -> pl.Expr:
         """
@@ -87,13 +72,7 @@ class ClinicalNlpExpr:
         ...     pl.col('note_text').cnlp.count_all(terms).alias('counts'),
         ... )
         """
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='count_all_concepts',
-            args=[self._expr],
-            kwargs=mapping_terms_kwargs(terms),
-            is_elementwise=True,
-        )
+        return cnlp.count_all(self._expr, terms)
 
     def affirmed(
             self,
@@ -135,17 +114,7 @@ class ClinicalNlpExpr:
         ...     pl.col('note_text').cnlp.affirmed(r'\\bpneumonia\\b'),
         ... )
         """
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='affirmed_concept',
-            args=[self._expr],
-            kwargs=algorithm_kwargs(
-                {'pattern': term},
-                algorithm,
-                prefilter,
-            ),
-            is_elementwise=True,
-        )
+        return cnlp.affirmed(self._expr, term, algorithm=algorithm, prefilter=prefilter)
 
     def affirmed_any(
             self,
@@ -192,17 +161,7 @@ class ClinicalNlpExpr:
         ...     pl.col('note_text').cnlp.affirmed_any(terms),
         ... )
         """
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='affirmed_any_concepts',
-            args=[self._expr],
-            kwargs=algorithm_kwargs(
-                predicate_terms_kwargs(terms),
-                algorithm,
-                prefilter,
-            ),
-            is_elementwise=True,
-        )
+        return cnlp.affirmed_any(self._expr, terms, algorithm=algorithm, prefilter=prefilter)
 
     def affirmed_all(
             self,
@@ -250,17 +209,7 @@ class ClinicalNlpExpr:
         ...     pl.col('note_text').cnlp.affirmed_all(terms),
         ... )
         """
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='affirmed_all_concepts',
-            args=[self._expr],
-            kwargs=algorithm_kwargs(
-                predicate_terms_kwargs(terms),
-                algorithm,
-                prefilter,
-            ),
-            is_elementwise=True,
-        )
+        return cnlp.affirmed_all(self._expr, terms, algorithm=algorithm, prefilter=prefilter)
 
     def affirmed_each(
             self,
@@ -305,17 +254,7 @@ class ClinicalNlpExpr:
         ...     pl.col('note_text').cnlp.affirmed_each(terms).alias('status'),
         ... )
         """
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='affirmed_each_concepts',
-            args=[self._expr],
-            kwargs=algorithm_kwargs(
-                mapping_terms_kwargs(terms),
-                algorithm,
-                prefilter,
-            ),
-            is_elementwise=True,
-        )
+        return cnlp.affirmed_each(self._expr, terms, algorithm=algorithm, prefilter=prefilter)
 
     def find_best(
             self,
@@ -366,17 +305,7 @@ class ClinicalNlpExpr:
         ... )
         """
 
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='find_best_concept',
-            args=[self._expr],
-            kwargs=algorithm_kwargs(
-                find_terms_kwargs(terms),
-                algorithm,
-                prefilter,
-            ),
-            is_elementwise=True,
-        )
+        return cnlp.find_best(self._expr, terms, algorithm=algorithm, prefilter=prefilter)
 
     def find_all(
             self,
@@ -426,14 +355,4 @@ class ClinicalNlpExpr:
         ...     pl.col('note_text').cnlp.find_all(terms).alias('findings'),
         ... )
         """
-        return register_plugin_function(
-            plugin_path=_PLUGIN_PATH,
-            function_name='find_all_concepts',
-            args=[self._expr],
-            kwargs=algorithm_kwargs(
-                find_terms_kwargs(terms),
-                algorithm,
-                prefilter,
-            ),
-            is_elementwise=True,
-        )
+        return cnlp.find_all(self._expr, terms, algorithm=algorithm, prefilter=prefilter)

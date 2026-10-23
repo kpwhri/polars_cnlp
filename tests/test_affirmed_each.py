@@ -1,9 +1,23 @@
 import polars as pl
+import pytest
 
 import polars_cnlp
+from polars_cnlp import cnlp
 
 
-def test_affirmed_each(terms):
+def namespace_affirmed_each(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return expr.cnlp.affirmed_each(terms)
+
+
+def function_affirmed_each(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return cnlp.affirmed_each(expr, terms)
+
+
+@pytest.mark.parametrize('func', [
+    namespace_affirmed_each,
+    function_affirmed_each,
+])
+def test_affirmed_each(terms, func):
     df = pl.DataFrame({'note_text': [
         'Pneumonia present.',
         'No pneumonia. Anaphylaxis present.',
@@ -15,7 +29,7 @@ def test_affirmed_each(terms):
     )
 
     result = df.select(
-        pl.col('note_text').cnlp.affirmed_each(terms).alias('status'),
+        func(pl.col('note_text'), terms).alias('status'),
     )
 
     assert result['status'].to_list() == [

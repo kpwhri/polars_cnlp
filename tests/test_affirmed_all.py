@@ -1,9 +1,23 @@
 import polars as pl
+import pytest
 
 import polars_cnlp
+from polars_cnlp import cnlp
 
 
-def test_affirmed_all_with_dict(terms):
+def namespace_affirmed_all(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return expr.cnlp.affirmed_all(terms)
+
+
+def function_affirmed_all(expr: pl.Expr, terms: dict) -> pl.Expr:
+    return cnlp.affirmed_all(expr, terms)
+
+
+@pytest.mark.parametrize('func', [
+    namespace_affirmed_all,
+    function_affirmed_all,
+])
+def test_affirmed_all_with_dict(terms, func):
     df = pl.DataFrame({'note_text': [
         'Pneumonia and anaphylaxis are present.',
         'No pneumonia. Anaphylaxis present.',
@@ -16,7 +30,7 @@ def test_affirmed_all_with_dict(terms):
     )
 
     result = df.select(
-        pl.col('note_text').cnlp.affirmed_all(terms).alias('affirmed'),
+        func(pl.col('note_text'), terms).alias('affirmed'),
     )
 
     assert result['affirmed'].to_list() == [True, False, None, False, None, None]
